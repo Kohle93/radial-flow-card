@@ -2,13 +2,13 @@
 
 [![hacs][hacs-badge]][hacs-url]
 [![release][release-badge]][release-url]
-[![license][license-badge]](LICENSE)
+[![license][license-badge]](https://github.com/Kohle93/radial-flow-card/blob/main/LICENSE)
 
 Energieflusskarte für Home Assistant mit radialem Aufbau: eine Nabe in der Mitte,
 alle Knoten auf einem Ring darum, animierte Punkte auf den Speichen. Eigenständige
 Karte ohne Abhängigkeiten, ohne Build-Schritt, mit vollständigem Editor.
 
-<img src="docs/images/hero.png" width="420" alt="Radiale Energieflusskarte">
+<img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/hero.png" width="420" alt="Radiale Energieflusskarte">
 
 ## Auf einen Blick
 
@@ -50,9 +50,9 @@ mit denselben Maßen wieder. Die vollständige Konfiguration steht jeweils in
 ### Minimal
 
 Drei Knoten, der Hausverbrauch wird als Bilanz gerechnet.
-[`examples/minimal.yaml`](examples/minimal.yaml)
+[`examples/minimal.yaml`](https://github.com/Kohle93/radial-flow-card/blob/main/examples/minimal.yaml)
 
-<img src="docs/images/example-minimal.png" width="360" alt="Minimalbeispiel mit drei Knoten">
+<img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/example-minimal.png" width="360" alt="Minimalbeispiel mit drei Knoten">
 
 ```yaml
 type: custom:radial-flow-card
@@ -68,44 +68,44 @@ grid:
 
 Sechs Knoten mit Speicher und zwei Verbrauchern. Die Wallbox steht auf 0 W und
 behält Farbe und Position, nur die Punkte auf ihrer Linie verschwinden.
-[`examples/standard.yaml`](examples/standard.yaml)
+[`examples/standard.yaml`](https://github.com/Kohle93/radial-flow-card/blob/main/examples/standard.yaml)
 
-<img src="docs/images/example-standard.png" width="360" alt="Standardbeispiel mit sechs Knoten">
+<img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/example-standard.png" width="360" alt="Standardbeispiel mit sechs Knoten">
 
 ### Kompakt
 
 Ohne Namen und ohne Titel, größere Knoten. Passt als dichte Kachel neben andere
-Karten. [`examples/compact.yaml`](examples/compact.yaml)
+Karten. [`examples/compact.yaml`](https://github.com/Kohle93/radial-flow-card/blob/main/examples/compact.yaml)
 
-<img src="docs/images/example-compact.png" width="360" alt="Kompakte Darstellung ohne Namen">
+<img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/example-compact.png" width="360" alt="Kompakte Darstellung ohne Namen">
 
 ### Überschuss
 
 Die Erzeugung lädt Speicher und Wallbox, der Rest geht ins Netz. Alle Punkte außer
-dem der Erzeugung laufen nach außen. [`examples/charging.yaml`](examples/charging.yaml)
+dem der Erzeugung laufen nach außen. [`examples/charging.yaml`](https://github.com/Kohle93/radial-flow-card/blob/main/examples/charging.yaml)
 
-<img src="docs/images/example-charging.png" width="360" alt="Überschuss lädt Speicher und Wallbox">
+<img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/example-charging.png" width="360" alt="Überschuss lädt Speicher und Wallbox">
 
 ### Nachtbetrieb
 
 Keine Erzeugung, der Speicher versorgt Haus und Wärmepumpe. Sein Punkt läuft als
-einziger nach innen. [`examples/night.yaml`](examples/night.yaml)
+einziger nach innen. [`examples/night.yaml`](https://github.com/Kohle93/radial-flow-card/blob/main/examples/night.yaml)
 
-<img src="docs/images/example-night.png" width="360" alt="Nachtbetrieb ohne Erzeugung">
+<img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/example-night.png" width="360" alt="Nachtbetrieb ohne Erzeugung">
 
 ### Heizung
 
 Mehrere Heizkreise mit dem eigenen Icon-Satz. Der Heizstab läuft nicht und bleibt
-trotzdem sichtbar. [`examples/heating.yaml`](examples/heating.yaml)
+trotzdem sichtbar. [`examples/heating.yaml`](https://github.com/Kohle93/radial-flow-card/blob/main/examples/heating.yaml)
 
-<img src="docs/images/example-heating.png" width="360" alt="Heizungsansicht mit eigenen Icons">
+<img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/example-heating.png" width="360" alt="Heizungsansicht mit eigenen Icons">
 
 ### Viele Verbraucher
 
 Neun Knoten. Ring und Knotengröße passen sich automatisch an, die Beschriftung
-bleibt innerhalb der Karte. [`examples/large.yaml`](examples/large.yaml)
+bleibt innerhalb der Karte. [`examples/large.yaml`](https://github.com/Kohle93/radial-flow-card/blob/main/examples/large.yaml)
 
-<img src="docs/images/example-large.png" width="360" alt="Beispiel mit neun Knoten">
+<img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/example-large.png" width="360" alt="Beispiel mit neun Knoten">
 
 ### Wallbox mit Ladestand
 
@@ -114,9 +114,9 @@ das Auto an der Wallbox. Der äußere Ring zeigt weiterhin die Leistung, der
 Ladestand kommt als eigene Anzeige dazu — wahlweise als liegende Batterie mit
 Prozentwert im Knoten (links, `soc_display: battery`) oder als innerer Ring, der
 bei 100 % geschlossen ist, mit dem Prozentwert im Kreis (rechts, `soc_display: ring`). Die Farbe ist über
-`soc_color` einstellbar. [`examples/wallbox-soc.yaml`](examples/wallbox-soc.yaml)
+`soc_color` einstellbar. [`examples/wallbox-soc.yaml`](https://github.com/Kohle93/radial-flow-card/blob/main/examples/wallbox-soc.yaml)
 
-<img src="docs/images/example-soc-battery.png" width="300" alt="Ladestand als Batteriesymbol im Knoten"> <img src="docs/images/example-soc-ring.png" width="300" alt="Ladestand als innerer Ring">
+<img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/example-soc-battery.png" width="300" alt="Ladestand als Batteriesymbol im Knoten"> <img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/example-soc-ring.png" width="300" alt="Ladestand als innerer Ring">
 
 ```yaml
 individual:
@@ -150,23 +150,23 @@ Kleinschreibung egal). Ohne `charging_entity` ist der Ladestand immer sichtbar.
 ### Helles Thema
 
 Die Karte übernimmt die Farben des aktiven Themes. Bei hellen Themes lohnen sich
-kräftigere Knotenfarben. [`examples/light-theme.yaml`](examples/light-theme.yaml)
+kräftigere Knotenfarben. [`examples/light-theme.yaml`](https://github.com/Kohle93/radial-flow-card/blob/main/examples/light-theme.yaml)
 
-<img src="docs/images/example-light.png" width="360" alt="Karte in einem hellen Theme">
+<img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/example-light.png" width="360" alt="Karte in einem hellen Theme">
 
 ### Zwei Knoten
 
 Der engste sinnvolle Fall: nur Erzeugung und Haus. Auch hier bleibt die Speiche
 deutlich sichtbar.
 
-<img src="docs/images/example-two-nodes.png" width="360" alt="Minimalfall mit zwei Knoten">
+<img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/example-two-nodes.png" width="360" alt="Minimalfall mit zwei Knoten">
 
 ### Zwölf Knoten
 
 Die praktische Obergrenze. Ring und Beschriftung bleiben lesbar, aber eng — ab
 hier lohnt sich eher ein zweites Dashboard als noch mehr Verbraucher.
 
-<img src="docs/images/example-twelve-nodes.png" width="360" alt="Zwölf Knoten an der praktischen Obergrenze">
+<img src="https://raw.githubusercontent.com/Kohle93/radial-flow-card/main/docs/images/example-twelve-nodes.png" width="360" alt="Zwölf Knoten an der praktischen Obergrenze">
 
 ## Konfigurationseditor
 
@@ -348,10 +348,10 @@ python3 tools/render_examples.py
 
 ## Lizenz
 
-MIT, siehe [LICENSE](LICENSE).
+MIT, siehe [LICENSE](https://github.com/Kohle93/radial-flow-card/blob/main/LICENSE).
 
 [hacs-badge]: https://img.shields.io/badge/HACS-Custom-41BDF5.svg
 [hacs-url]: https://hacs.xyz
 [release-badge]: https://img.shields.io/badge/version-4.6.1-blue.svg
-[release-url]: ../../releases
+[release-url]: https://github.com/Kohle93/radial-flow-card/releases
 [license-badge]: https://img.shields.io/badge/license-MIT-green.svg
