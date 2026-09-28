@@ -1,0 +1,30 @@
+# Wallbox mit Ladestand des Autos.
+# soc_display: battery  -> liegende Batterie mit Prozent im Knoten (Standard)
+# soc_display: ring     -> eigener Ring innerhalb des Leistungsrings, voll = 100 %
+type: custom:radial-flow-card
+title: Wallbox
+show_names: true
+
+solar:
+  entity: sensor.pv_leistung
+  max_power: 10000
+grid:
+  entity: sensor.netz_leistung
+battery:
+  entity: sensor.speicher_leistung
+  state_of_charge: sensor.speicher_soc
+
+individual:
+  - entity: sensor.wallbox_leistung
+    name: Wallbox
+    icon: mdi:car-electric
+    color: "#a97bd6"
+    max_power: 11000
+    state_of_charge: sensor.auto_ladestand
+    soc_display: ring
+    soc_color: "#4cb5e0"
+    # Ladestand nur zeigen, während das Auto lädt
+    charging_entity: binary_sensor.wallbox_laedt
+    tap_action:
+      action: navigate
+      navigation_path: /lovelace/wallbox

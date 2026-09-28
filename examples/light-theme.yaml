@@ -1,0 +1,23 @@
+# Die Karte übernimmt die Farben des aktiven Themes.
+# Bei hellen Themes lohnt es sich, kräftigere Knotenfarben zu setzen.
+type: custom:radial-flow-card
+title: Helles Thema
+title_size: 18
+
+solar:
+  entity: sensor.pv_leistung
+  color: "#e0a020"
+  max_power: 10000
+grid:
+  entity: sensor.netz_leistung
+  color: "#6f7883"
+battery:
+  entity: sensor.speicher_leistung
+  color: "#3f9e5c"
+  state_of_charge: sensor.speicher_soc
+
+individual:
+  - entity: sensor.wallbox_leistung
+    name: Wallbox
+    color: "#8c5cc0"
+    icon: mdi:ev-station

@@ -1,0 +1,29 @@
+# Heizungsansicht mit dem eigenen Icon-Satz.
+# Der Heizstab läuft nicht und bleibt trotzdem sichtbar.
+type: custom:radial-flow-card
+title: Heizung
+
+solar:
+  entity: sensor.pv_leistung
+  max_power: 10000
+grid:
+  entity: sensor.netz_leistung
+home:
+  entity: sensor.hausverbrauch
+
+individual:
+  - entity: sensor.waermepumpe_leistung
+    name: Wärmepumpe
+    icon: rf:heatpump
+    color: "#e8833a"
+    secondary_entity: sensor.vorlauftemperatur
+    note: Heizkreis 1
+  - entity: sensor.heizstab_leistung
+    name: Heizstab
+    icon: rf:heat-waves
+    color: "#c76a4e"
+  - entity: sensor.fussbodenheizung_leistung
+    name: Fußboden
+    icon: rf:floor-heating
+    color: "#7f9f3a"
+    subtract_from_home: false

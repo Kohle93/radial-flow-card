@@ -1,0 +1,14 @@
+# Ohne Namen und ohne Titel: dichte Kachel für ein Übersichtsdashboard.
+type: custom:radial-flow-card
+show_names: false
+node_size: 1.1
+card_width: 96
+
+solar:
+  entity: sensor.pv_leistung
+  max_power: 10000
+grid:
+  entity: sensor.netz_leistung
+battery:
+  entity: sensor.speicher_leistung
+  state_of_charge: sensor.speicher_soc

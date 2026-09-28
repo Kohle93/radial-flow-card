@@ -1,0 +1,41 @@
+# Typischer Aufbau mit Speicher und zwei Verbrauchern.
+type: custom:radial-flow-card
+title: Energiefluss
+title_size: 18
+title_weight: 600
+
+solar:
+  entity: sensor.pv_leistung
+  max_power: 10000
+
+grid:
+  entity:
+    consumption: sensor.netz_bezug
+    production: sensor.netz_einspeisung
+
+battery:
+  entity:
+    discharge: sensor.speicher_entladeleistung
+    charge: sensor.speicher_ladeleistung
+  state_of_charge: sensor.speicher_soc
+
+home:
+  entity: sensor.hausverbrauch
+
+individual:
+  - entity: sensor.wallbox_leistung
+    name: Wallbox
+    icon: mdi:ev-station
+    color: "#a97bd6"
+    max_power: 11000
+    tap_action:
+      action: navigate
+      navigation_path: /lovelace/wallbox
+  - entity: sensor.waermepumpe_leistung
+    name: Wärmepumpe
+    icon: rf:heatpump
+    color: "#e8833a"
+    subtract_from_home: true
+
+speed: 1.6
+display_zero_tolerance: 5

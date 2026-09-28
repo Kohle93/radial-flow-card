@@ -1,0 +1,9 @@
+# Drei Knoten: PV, Haus, Netz.
+# Der Hausverbrauch wird als Bilanz gerechnet, da kein eigener Sensor gesetzt ist.
+type: custom:radial-flow-card
+title: Energie
+solar:
+  entity: sensor.pv_leistung
+  max_power: 9000
+grid:
+  entity: sensor.netz_leistung

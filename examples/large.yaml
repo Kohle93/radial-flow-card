@@ -1,0 +1,40 @@
+# Viele Verbraucher. Die Knoten verteilen sich automatisch auf dem Ring.
+type: custom:radial-flow-card
+title: Hausübersicht
+node_size: 0.9
+ring_radius: 270
+show_names: true
+
+center_image: /local/logo.svg
+center_background: "#c62828"
+center_image_fit: cover
+
+solar:
+  entity: sensor.pv_leistung
+  max_power: 10000
+grid:
+  entity: sensor.netz_leistung
+battery:
+  entity: sensor.speicher_leistung
+  invert: true
+  state_of_charge: sensor.speicher_soc
+home:
+  entity: sensor.hausverbrauch
+
+individual:
+  - entity: sensor.wallbox_leistung
+    name: Wallbox
+    icon: mdi:ev-station
+  - entity: sensor.waermepumpe_leistung
+    name: Wärmepumpe
+    icon: rf:heatpump-waves
+  - entity: sensor.waschkueche_leistung
+    name: Waschküche
+    icon: mdi:washing-machine
+  - entity: sensor.pool_leistung
+    name: Pool
+    icon: mdi:pool
+  - entity: sensor.buero_leistung
+    name: Büro
+    icon: mdi:desktop-tower-monitor
+    subtract_from_home: false

@@ -1,0 +1,6 @@
+{
+  "name": "Radial Flow Card",
+  "render_readme": true,
+  "filename": "radial-flow-card.js",
+  "homeassistant": "2024.4.0"
+}
