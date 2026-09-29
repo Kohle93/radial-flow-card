@@ -1,5 +1,22 @@
 # Änderungen
 
+## 5.0.0
+- Editor komplett neu aufgebaut, einheitlich mit der Status-Übersicht-Karte und
+  der Trash Card Plus: Tab-Leiste (Knoten, Anzeige, Animation, Werte, Design),
+  Einleitung je Tab und aufklappbare Gruppen mit Symbol
+- Knoten-Tab als Liste mit Symbol in Knotenfarbe, Sensor, Sortieren und
+  Entfernen; Antippen öffnet eine eigene Bearbeiten-Seite mit Live-Vorschau
+  (aktueller Wert und Ring)
+- Neuer Design-Tab: Hintergrund (Theme, eigene Farbe, transparent) mit
+  Deckkraft, Farbverlauf und Glas-Effekt, Textfarbe mit automatischem Kontrast,
+  Schriftgröße der Werte, Rahmen, Schatten, Eckenradius und Innenabstand
+- Werte, die dem Standard entsprechen, werden nicht mehr in die YAML geschrieben;
+  Farben aus YAML (z. B. Hex) bleiben beim Bearbeiten im Originalformat
+- Behoben: die Schalter „Vom Hausverbrauch abziehen“ standen im Editor auf aus,
+  obwohl die Funktion aktiv war
+- Behoben: `center_background` aus dem Farbwähler ([r,g,b]) wurde nicht angewendet
+- Behoben: ein leerer PV-/Netz-/Speicher-Knoten wird nicht mehr als `{}` gespeichert
+
 ## 4.6.1
 - Ring-Variante des Ladestands (`soc_display: ring`) zeigt zusätzlich den
   Prozentwert im Kreis unter dem Icon, in der Farbe des Ladestands

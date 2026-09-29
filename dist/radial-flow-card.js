@@ -6,7 +6,7 @@
  * Kein Build-Schritt nötig — Datei als Modul-Ressource einbinden.
  */
 
-const VERSION = "4.6.1";
+const VERSION = "5.0.0";
 
 /* ==================================================================
    Defaults
@@ -48,6 +48,22 @@ const DEFAULTS = {
   node_size: 1,
   ring_radius: 320,
   card_width: 100,
+
+  // Design (gleiches System wie Status-Übersicht-Karte und Trash Card Plus)
+  bg_mode: "theme",
+  bg_color: null,
+  bg_opacity: 100,
+  bg_gradient: false,
+  blur: 0,
+  text_color_mode: "auto",
+  text_color: null,
+  font_scale: 100,
+  border_mode: "theme",
+  border_color: null,
+  border_width: 1,
+  shadow: "theme",
+  radius: null,
+  padding: 8,
 };
 
 const BASE_NODE_RADIUS = 92;    // Knotenradius bei node_size = 1, im 1000er-Grundraster
@@ -194,6 +210,94 @@ function toColor(c, fallback) {
   if (c === undefined || c === null || c === "") return fallback;
   if (Array.isArray(c)) return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
   return c;
+}
+
+/* ==================================================================
+   Design – dasselbe System wie in der Status-Übersicht-Karte und der
+   Trash Card Plus: Hintergrund mit Deckkraft, Farbverlauf und
+   Glas-Effekt, Textfarbe mit automatischem Kontrast, Rahmen, Schatten,
+   Eckenradius und Innenabstand.
+================================================================== */
+const THEME_BG = "var(--ha-card-background, var(--card-background-color, #1b2029))";
+const SHADOWS = {
+  none: "none",
+  soft: "0 2px 8px rgba(0,0,0,.12)",
+  strong: "0 6px 20px rgba(0,0,0,.28)",
+};
+
+/** [r,g,b] aus Farbwähler-Array, Hex-Code oder rgb()-String, sonst null. */
+function rgbOf(c) {
+  if (Array.isArray(c) && c.length >= 3) return c.slice(0, 3).map((v) => Number(v) || 0);
+  if (typeof c !== "string") return null;
+  const s = c.trim();
+  let h = s.replace("#", "");
+  if (s.startsWith("#")) {
+    if (/^[0-9a-f]{3}$/i.test(h)) h = h.split("").map((x) => x + x).join("");
+    if (/^[0-9a-f]{6}$/i.test(h)) return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    return null;
+  }
+  const m = s.match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i);
+  return m ? [+m[1], +m[2], +m[3]] : null;
+}
+
+const sameRgb = (a, b) => {
+  const x = rgbOf(a);
+  const y = rgbOf(b);
+  return !!x && !!y && x.every((v, i) => v === y[i]);
+};
+
+function withAlpha(css, pct) {
+  const p = clamp(Number(pct), 0, 100);
+  if (p >= 100) return css;
+  if (p <= 0) return "transparent";
+  return `color-mix(in srgb, ${css} ${p}%, transparent)`;
+}
+
+function contrastText(rgb) {
+  const f = (v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+  const lum = 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]);
+  return lum > 0.45 ? "#1c1c1c" : "#ffffff";
+}
+
+/** Liefert die CSS-Deklarationen für ha-card sowie die Textfarben. */
+function cardDesign(c) {
+  const css = [];
+  let text = null;
+
+  const mode = c.bg_mode || "theme";
+  const op = clamp(num(c.bg_opacity ?? 100), 0, 100);
+  if (mode === "none") {
+    css.push("background: transparent");
+  } else if (mode === "custom") {
+    const col = toColor(c.bg_color, THEME_BG);
+    const bg = c.bg_gradient
+      ? `linear-gradient(135deg, ${withAlpha(col, op)} 0%, ${withAlpha(`color-mix(in srgb, ${col} 62%, black)`, op)} 100%)`
+      : withAlpha(col, op);
+    css.push(`background: ${bg}`);
+    const rgb = rgbOf(c.bg_color);
+    if ((c.text_color_mode || "auto") === "auto" && rgb && op >= 55) text = contrastText(rgb);
+  } else if (op < 100) {
+    css.push(`background: ${withAlpha(THEME_BG, op)}`);
+  }
+
+  const blur = clamp(num(c.blur), 0, 30);
+  if (blur > 0) css.push(`backdrop-filter: blur(${blur}px)`, `-webkit-backdrop-filter: blur(${blur}px)`);
+
+  // "theme" lässt den normalen Rahmen des Themes unangetastet
+  const bw = clamp(num(c.border_width ?? 1), 0, 6);
+  if (c.border_mode === "none") css.push("border: none");
+  else if (c.border_mode === "accent") css.push(`border: ${bw}px solid var(--primary-color)`);
+  else if (c.border_mode === "custom") css.push(`border: ${bw}px solid ${toColor(c.border_color, "var(--primary-color)")}`);
+
+  if (c.shadow && c.shadow !== "theme") css.push(`box-shadow: ${SHADOWS[c.shadow] || "none"}`);
+  if (c.radius !== null && c.radius !== undefined && c.radius !== "") css.push(`border-radius: ${clamp(num(c.radius), 0, 40)}px`);
+
+  if (c.text_color_mode === "custom" && c.text_color) text = toColor(c.text_color);
+  return {
+    card: css.map((d) => `${d};`).join(" "),
+    text,
+    text2: text ? `color-mix(in srgb, ${text} 70%, transparent)` : null,
+  };
 }
 
 function readSingle(hass, entityId) {
@@ -678,19 +782,25 @@ class RadialFlowCard extends HTMLElement {
   _styles(nodeR, hubR, vb) {
     const c = this._config;
     const filled = !!c.center_background;
+    const d = cardDesign(c);
+    const pad = clamp(num(c.padding ?? 8), 0, 32);
+    const fs = clamp(num(c.font_scale ?? 100), 60, 160) / 100;
     return `
       :host { display: block; }
-      ha-card { overflow: hidden; padding: 0 8px 12px; position: relative; }
+      ha-card {
+        overflow: hidden; padding: 0 ${pad}px ${pad + 4}px; position: relative; ${d.card}
+        ${d.text ? `--rf-text: ${d.text}; --rf-text2: ${d.text2};` : ""}
+      }
       .title {
         position: absolute;
         top: 12px;
-        ${c.title_align === "right" ? "right: 18px;" : c.title_align === "center" ? "left: 0; right: 0; text-align: center;" : "left: 18px;"}
+        ${c.title_align === "right" ? `right: ${pad + 10}px;` : c.title_align === "center" ? "left: 0; right: 0; text-align: center;" : `left: ${pad + 10}px;`}
         z-index: 2;
         pointer-events: none;
         font-size: ${clamp(c.title_size ?? 16, 8, 48)}px;
         font-weight: ${clamp(Math.round((c.title_weight ?? 500) / 100) * 100, 100, 900)};
         line-height: 1.2;
-        color: ${toColor(c.title_color, "var(--primary-text-color)")};
+        color: ${toColor(c.title_color, "var(--rf-text, var(--primary-text-color))")};
       }
       .wrap {
         position: relative;
@@ -712,7 +822,7 @@ class RadialFlowCard extends HTMLElement {
         width: ${((2 * hubR) / vb) * 100}%; aspect-ratio: 1;
         transform: translate(-50%, -50%);
         border-radius: 50%;
-        background: ${filled ? c.center_background : "var(--ha-card-background, var(--card-background-color, #1b2029))"};
+        background: ${filled ? toColor(c.center_background) : THEME_BG};
         border: ${filled ? "none" : "1.5px solid var(--divider-color, rgba(127,140,158,.4))"};
         display: flex; align-items: center; justify-content: center;
         cursor: pointer; overflow: hidden;
@@ -722,7 +832,7 @@ class RadialFlowCard extends HTMLElement {
         object-fit: ${c.center_image_fit === "cover" ? "cover" : "contain"};
         ${c.center_image_fit === "cover" ? "" : "padding: 14%; box-sizing: border-box;"}
       }
-      .hub-icon { --mdc-icon-size: 6cqw; color: var(--secondary-text-color); }
+      .hub-icon { --mdc-icon-size: 6cqw; color: var(--rf-text2, var(--secondary-text-color)); }
 
       .node {
         position: absolute; transform: translate(-50%, -50%);
@@ -756,9 +866,9 @@ class RadialFlowCard extends HTMLElement {
       .node.above .label { bottom: 104%; left: 50%; transform: translateX(-50%); text-align: center; }
       .node.below .label { top: 104%; left: 50%; transform: translateX(-50%); text-align: center; }
 
-      .line1 { font-size: 4.4cqw; font-weight: 600; color: var(--primary-text-color); letter-spacing: -.01em; }
-      .unit { font-size: 2.9cqw; font-weight: 400; color: var(--secondary-text-color); margin-left: 3px; }
-      .name, .extra { font-size: 2.6cqw; color: var(--secondary-text-color); }
+      .line1 { font-size: ${(4.4 * fs).toFixed(2)}cqw; font-weight: 600; color: var(--rf-text, var(--primary-text-color)); letter-spacing: -.01em; }
+      .unit { font-size: ${(2.9 * fs).toFixed(2)}cqw; font-weight: 400; color: var(--rf-text2, var(--secondary-text-color)); margin-left: 3px; }
+      .name, .extra { font-size: ${(2.6 * fs).toFixed(2)}cqw; color: var(--rf-text2, var(--secondary-text-color)); }
       .name { display: ${c.show_names ? "block" : "none"}; }
       .name:empty, .extra:empty { display: none; }
 
@@ -1075,67 +1185,102 @@ class RadialFlowCard extends HTMLElement {
 /* ==================================================================
    Editor
 ================================================================== */
-const LABELS = {
-  title: "Titel",
-  title_color: "Titelfarbe",
-  title_size: "Titelgroesse (px)",
-  title_weight: "Schriftstaerke des Titels",
-  title_align: "Titelausrichtung",
-  center_image: "Bild in der Mitte (z. B. /local/logo.svg)",
-  center_icon: "Icon in der Mitte",
-  center_background: "Farbe der Mitte (fuellt den Kreis)",
-  center_size: "Groesse der Mitte",
-  center_image_fit: "Bild einpassen",
-  track_opacity: "Deckkraft des Ringhintergrunds",
-  ring_transition: "Uebergang des Rings (ms)",
-  entity_a: "Sensor A",
-  entity_b: "Sensor B",
-  center_tap_action: "Tippen auf die Mitte",
-  center_hold_action: "Halten auf die Mitte",
-  node_size: "Knotengroesse",
-  card_width: "Breite der Grafik (% der Karte)",
-  ring_radius: "Ringgroesse",
-  dot_size: "Punktgroesse",
-  show_names: "Namen anzeigen",
-  tail_length: "Schweiflaenge",
-  tail_segments: "Schweifaufloesung",
-
-  kilo_threshold: "Umschaltschwelle auf kW",
-  base_decimals: "Nachkommastellen W",
-  kilo_decimals: "Nachkommastellen kW",
-  speed: "Tempo insgesamt",
-  cycle_gap: "Pause zwischen zwei Durchlaeufen (s)",
-  min_flow_rate: "Schnellste Animation (s)",
-  max_flow_rate: "Langsamste Animation (s)",
-  min_expected_power: "Untere Leistungsgrenze (W)",
-  max_expected_power: "Obere Leistungsgrenze (W)",
-  display_zero_tolerance: "Toleranz fuer aus (W)",
-  display_zero_mode: "Darstellung bei 0 W",
-  grey_color: "Graufarbe",
-  transparency: "Transparenz (%)",
-
-  entity: "Sensor",
-  invert: "Vorzeichen umkehren",
-  name: "Name",
-  icon: "Icon",
-  color: "Farbe",
-  unit: "Einheit (leer = automatisch)",
-  decimals: "Nachkommastellen",
-  note: "Zusatzhinweis (fester Text)",
-  secondary_entity: "Zusatzsensor",
-  secondary_unit: "Einheit Zusatzsensor",
-  state_of_charge: "Ladestandssensor",
-  soc_display: "Anzeige des Ladestands",
-  soc_color: "Farbe des Ladestands",
-  charging_entity: "Sensor \"lädt gerade\" (leer = Ladestand immer zeigen)",
-  charging_state: "Zustand für \"lädt\" (leer = on, charging, Zahl > 0 …)",
-  max_power: "Maximalleistung fuer den Ring (W)",
-  ring_source: "Ringanzeige",
-  subtract_from_home: "Vom Hausverbrauch abziehen",
-  subtract_individual: "Einzelgeraete vom Hausverbrauch abziehen",
-  tap_action: "Tippen",
-  hold_action: "Halten",
-  double_tap_action: "Doppeltippen",
+/* ==================================================================
+   Editor – gleicher Aufbau wie Status-Übersicht-Karte und Trash Card
+   Plus: Tab-Leiste oben, Einleitung je Tab, aufklappbare Gruppen mit
+   Symbol, Knotenliste mit eigener Bearbeiten-Seite und Vorschau.
+================================================================== */
+const T = {
+  tabs: { nodes: "Knoten", display: "Anzeige", motion: "Animation", values: "Werte", design: "Design" },
+  intro: {
+    nodes: "Welche Sensoren liefern die Leistung? PV, Haus, Speicher und Netz sind fest, Verbraucher kannst du beliebig ergänzen und sortieren. Zum Bearbeiten einfach antippen.",
+    display: "Grundlayout der Grafik: Titel, Mitte sowie Größe von Knoten und Ring.",
+    motion: "Wie schnell und wie auffällig die Punkte fließen. Das Tempo wirkt auf alle Linien, die Abstufung nach Leistung bleibt erhalten.",
+    values: "Zahlenformat für alle Knoten, sofern dort nichts Eigenes eingetragen ist, und wie Linien bei 0 W aussehen.",
+    design: "Hintergrund, Transparenz und Rahmen der Karte – genau wie bei der Status-Übersicht und der Abfall-Karte einstellbar.",
+  },
+  groups: {
+    title: "Titel", center: "Mitte", ring: "Knoten & Ring",
+    dots: "Punkte & Schweif", timing: "Tempo nach Leistung",
+    number: "Zahlenformat", zero: "Darstellung bei 0 W",
+    bg: "Hintergrund & Transparenz", text: "Text", frame: "Rahmen, Form & Abstände",
+    sensor: "Sensor", look: "Name, Symbol & Farbe", node_values: "Werte & Ring", soc: "Ladestand",
+    behaviour: "Verhalten", extra: "Zusatzinfo", actions: "Aktionen",
+  },
+  fields: {
+    title: "Titel (optional)", title_color: "Titelfarbe", title_size: "Schriftgröße Titel",
+    title_weight: "Schriftstärke Titel", title_align: "Ausrichtung Titel",
+    center_icon: "Symbol in der Mitte", center_size: "Größe der Mitte",
+    center_image: "Bild statt Symbol (URL)", center_image_fit: "Bild einpassen",
+    center_background: "Füllfarbe der Mitte",
+    center_tap_action: "Aktion beim Antippen der Mitte", center_hold_action: "Aktion beim Halten der Mitte",
+    card_width: "Breite der Grafik", node_size: "Knotengröße", ring_radius: "Ringgröße",
+    track_opacity: "Deckkraft Ringhintergrund", ring_transition: "Übergang des Rings",
+    show_names: "Namen unter den Werten anzeigen",
+    speed: "Tempo insgesamt", dot_size: "Punktgröße", cycle_gap: "Pause zwischen Durchläufen",
+    tail_length: "Schweiflänge", tail_segments: "Schweifauflösung",
+    min_flow_rate: "Schnellster Durchlauf", max_flow_rate: "Langsamster Durchlauf",
+    min_expected_power: "Untere Leistungsgrenze", max_expected_power: "Obere Leistungsgrenze",
+    kilo_threshold: "Ab dieser Leistung in kW anzeigen", base_decimals: "Nachkommastellen W",
+    kilo_decimals: "Nachkommastellen kW", display_zero_tolerance: "Toleranz für „aus“",
+    display_zero_mode: "Linie bei 0 W", grey_color: "Graufarbe", transparency: "Transparenz",
+    bg_mode: "Hintergrund", bg_color: "Hintergrundfarbe", bg_opacity: "Deckkraft", bg_gradient: "Farbverlauf",
+    blur: "Unschärfe dahinter (Glas-Effekt)",
+    text_color_mode: "Textfarbe der Werte", text_color: "Eigene Textfarbe", font_scale: "Schriftgröße der Werte",
+    border_mode: "Rahmen", border_color: "Rahmenfarbe", border_width: "Rahmenstärke",
+    shadow: "Schatten", radius: "Eckenradius", padding: "Innenabstand",
+    entity: "Sensor (Leistung)", entity_a: "Sensor A", entity_b: "Sensor B", invert: "Vorzeichen umkehren",
+    name: "Name", icon: "Symbol", color: "Farbe", unit: "Einheit (leer = automatisch)", decimals: "Nachkommastellen",
+    max_power: "Maximalleistung für den Ring", ring_source: "Ring zeigt",
+    state_of_charge: "Ladestandssensor (%)", soc_display: "Anzeige des Ladestands", soc_color: "Farbe des Ladestands",
+    charging_entity: "Sensor „lädt gerade“ (optional)", charging_state: "Zustände für „lädt“ (leer = automatisch)",
+    subtract_from_home: "Vom Hausverbrauch abziehen", subtract_individual: "Verbraucher vom Hausverbrauch abziehen",
+    secondary_entity: "Zusatzsensor (dritte Zeile)", secondary_unit: "Einheit Zusatzsensor", note: "Zusatztext (fest)",
+    tap_action: "Aktion beim Antippen", hold_action: "Aktion beim Halten", double_tap_action: "Aktion beim Doppeltippen",
+  },
+  helpers: {
+    title: "Liegt über der Grafik und verschiebt sie nicht.",
+    center_background: "Füllt den Kreis vollständig, dann entfällt der Rahmen.",
+    center_image: "Bild nach /config/www legen und /local/dateiname.svg eintragen.",
+    ring_radius: "Knoten- und Ringgröße wirken direkt. Nur wenn sich Knoten sonst berühren würden, wird die Grafik insgesamt etwas kleiner.",
+    tail_segments: "0 schaltet den Schweif ab.",
+    min_expected_power: "Unterhalb läuft die Animation am langsamsten, oberhalb der oberen Grenze am schnellsten.",
+    display_zero_tolerance: "Unterhalb dieses Werts gilt ein Knoten als aus.",
+    bg_opacity: "0 % = durchsichtig, 100 % = deckend.",
+    blur: "Der Hintergrund hinter der Karte wird unscharf durchscheinend – wie Milchglas.",
+    text_color_mode: "„Automatisch“ wählt auf kräftigen eigenen Hintergründen eine gut lesbare Farbe.",
+    font_scale: "Skaliert Werte, Einheiten und Namen an den Knoten.",
+    border_mode: "„Dezent (Theme)“ entspricht dem normalen Rahmen deines Themes.",
+    entity_a: "Alternativ zum kombinierten Sensor: zwei getrennte Sensoren.",
+    max_power: "Leer = Ring immer voll. Sonst zeigt der Ring den Anteil an dieser Leistung.",
+    charging_state: "Mehrere Zustände mit Komma trennen. Automatisch erkannt: on, charging, lädt, Zahlen > 0 …",
+    subtract_from_home: "Verhindert, dass die Leistung doppelt im Haus mitgezählt wird.",
+    subtract_individual: "Hauptschalter für alle Verbraucher.",
+    note: "Erscheint als feste Zeile unter dem Wert.",
+  },
+  node_helpers: {
+    home: { entity: "Leer = Hausverbrauch wird als Bilanz aus PV, Netz und Speicher berechnet." },
+    default: { entity: "Ohne Sensor zeigt der Knoten 0 W." },
+  },
+  opt: {
+    title_weight: { 300: "Leicht", 400: "Normal", 500: "Mittel", 600: "Halbfett", 700: "Fett", 800: "Sehr fett" },
+    title_align: { left: "Links", center: "Mittig", right: "Rechts" },
+    center_image_fit: { contain: "Mit Rand einpassen", cover: "Füllt den Kreis" },
+    display_zero_mode: { show: "Unverändert", grey: "Ausgrauen", transparency: "Transparent", hide: "Ausblenden" },
+    ring_source: { soc: "Ladestand", power: "Leistung" },
+    soc_display: { battery: "Batteriesymbol mit Prozent", ring: "Innerer Ring (voll = 100 %)", none: "Nicht anzeigen" },
+    bg_mode: { theme: "Karten-Hintergrund (Theme)", custom: "Eigene Farbe", none: "Transparent (kein Hintergrund)" },
+    text_color_mode: { auto: "Automatisch (guter Kontrast)", theme: "Theme-Textfarbe", custom: "Eigene Farbe" },
+    border_mode: { none: "Kein Rahmen", accent: "Akzentfarbe (Theme)", theme: "Dezent (Theme)", custom: "Eigene Farbe" },
+    shadow: { theme: "Wie Theme", none: "Kein Schatten", soft: "Weich", strong: "Kräftig" },
+  },
+  node_types: { solar: "PV", grid: "Netz", battery: "Speicher", home: "Haus", individual: "Verbraucher" },
+  sections: { sources: "Quellen & Haus", consumers: "Verbraucher" },
+  preview: "Vorschau · aktueller Wert", back: "Zurück", edit: "Bearbeiten", delete: "Entfernen",
+  move_up: "Nach vorn", move_down: "Nach hinten", add_consumer: "Verbraucher hinzufügen",
+  edit_node: "bearbeiten", not_set: "Nicht eingerichtet – antippen zum Einrichten",
+  no_entity: "Kein Sensor gewählt", balance: "Kein Sensor – Bilanz aus PV, Netz und Speicher",
+  tag_soc: "Ladestand", tag_off: "aus", no_consumers: "Noch keine Verbraucher angelegt.",
 };
 
 const NODE_LABEL_OVERRIDES = {
@@ -1155,498 +1300,354 @@ const POWER_ENTITY = {
   entity: { filter: [{ domain: ["sensor", "input_number", "counter", "number"] }] },
 };
 
-function nodeSchema(type) {
-  const schema = [{ name: "entity", selector: POWER_ENTITY }];
-  if (type === "grid" || type === "battery") {
-    schema.push({ name: "entity_a", selector: POWER_ENTITY });
-    schema.push({ name: "entity_b", selector: POWER_ENTITY });
-  }
-  schema.push({ name: "invert", selector: { boolean: {} } });
-  schema.push({
-    type: "grid",
-    schema: [
-      { name: "name", selector: { text: {} } },
-      { name: "icon", selector: { icon: {} } },
-    ],
-  });
-  schema.push({ name: "color", selector: { color_rgb: {} } });
-  schema.push({
-    type: "grid",
-    schema: [
-      { name: "unit", selector: { text: {} } },
-      { name: "decimals", selector: { number: { min: 0, max: 4, step: 1, mode: "box" } } },
-    ],
-  });
-  if (type === "battery") {
-    schema.push({ name: "state_of_charge", selector: { entity: {} } });
-    schema.push({
-      name: "ring_source",
-      selector: {
-        select: {
-          mode: "dropdown",
-          options: [
-            { value: "soc", label: "Ladestand" },
-            { value: "power", label: "Leistung" },
-          ],
-        },
-      },
-    });
-  }
-  if (type !== "home") {
-    schema.push({ name: "max_power", selector: { number: { min: 0, max: 60000, step: 100, mode: "box" } } });
-  }
-  if (type === "individual") {
-    schema.push({ name: "subtract_from_home", selector: { boolean: {} } });
-    // Ladestand, z. B. des Autos an der Wallbox
-    schema.push({ name: "state_of_charge", selector: { entity: {} } });
-    schema.push({
-      name: "soc_display",
-      selector: {
-        select: {
-          mode: "dropdown",
-          options: [
-            { value: "battery", label: "Batteriesymbol mit Prozent im Knoten" },
-            { value: "ring", label: "Innerer Ring (voll = 100 %)" },
-            { value: "none", label: "Nicht anzeigen" },
-          ],
-        },
-      },
-    });
-    schema.push({ name: "soc_color", selector: { color_rgb: {} } });
-    schema.push({ name: "charging_entity", selector: { entity: {} } });
-    schema.push({ name: "charging_state", selector: { text: {} } });
-  }
-  if (type === "home") schema.push({ name: "subtract_individual", selector: { boolean: {} } });
-  schema.push({ name: "secondary_entity", selector: { entity: {} } });
-  schema.push({ name: "note", selector: { text: {} } });
-  schema.push({ name: "tap_action", selector: { ui_action: {} } });
-  schema.push({ name: "hold_action", selector: { ui_action: {} } });
-  schema.push({ name: "double_tap_action", selector: { ui_action: {} } });
-  return schema;
-}
-
-const CARD_SCHEMA = [
-  { name: "title", selector: { text: {} } },
-  {
-    type: "grid",
-    schema: [
-      { name: "title_color", selector: { color_rgb: {} } },
-      { name: "title_size", selector: { number: { min: 8, max: 48, step: 1, mode: "box" } } },
-    ],
-  },
-  {
-    name: "title_weight",
-    selector: {
-      select: {
-        mode: "dropdown",
-        options: [
-          { value: 300, label: "leicht" },
-          { value: 400, label: "normal" },
-          { value: 500, label: "mittel" },
-          { value: 600, label: "halbfett" },
-          { value: 700, label: "fett" },
-          { value: 800, label: "sehr fett" },
-        ],
-      },
-    },
-  },
-  {
-    name: "title_align",
-    selector: {
-      select: {
-        mode: "dropdown",
-        options: [
-          { value: "left", label: "links" },
-          { value: "center", label: "mittig" },
-          { value: "right", label: "rechts" },
-        ],
-      },
-    },
-  },
-  { name: "card_width", selector: { number: { min: 40, max: 100, step: 1, mode: "slider" } } },
+const EDITOR_TABS = [
+  { id: "nodes", icon: "mdi:hub-outline" },
+  { id: "display", icon: "mdi:view-dashboard-outline" },
+  { id: "motion", icon: "mdi:motion-play-outline" },
+  { id: "values", icon: "mdi:numeric" },
+  { id: "design", icon: "mdi:palette-outline" },
 ];
 
-const CENTER_SCHEMA = [
-  { name: "center_image", selector: { text: {} } },
-  {
-    name: "center_image_fit",
-    selector: {
-      select: {
-        mode: "dropdown",
-        options: [
-          { value: "contain", label: "Bild mit Rand einpassen" },
-          { value: "cover", label: "Bild fuellt den Kreis" },
-        ],
-      },
-    },
-  },
-  {
-    type: "grid",
-    schema: [
-      { name: "center_icon", selector: { icon: {} } },
-      { name: "center_size", selector: { number: { min: 0.6, max: 1.8, step: 0.05, mode: "box" } } },
-    ],
-  },
-  { name: "center_background", selector: { color_rgb: {} } },
-  { name: "center_tap_action", selector: { ui_action: {} } },
-  { name: "center_hold_action", selector: { ui_action: {} } },
-];
+// Merkt sich den offenen Tab, auch wenn HA den Editor neu erzeugt
+const EDITOR_STATE = { tab: "nodes" };
 
-const RING_SCHEMA = [
-  { name: "node_size", selector: { number: { min: 0.5, max: 1.8, step: 0.05, mode: "slider" } } },
-  { name: "ring_radius", selector: { number: { min: 140, max: 400, step: 5, mode: "slider" } } },
-  {
-    type: "grid",
-    schema: [
-      { name: "track_opacity", selector: { number: { min: 0, max: 1, step: 0.02, mode: "box" } } },
-      { name: "ring_transition", selector: { number: { min: 0, max: 2000, step: 50, mode: "box" } } },
-    ],
-  },
-  { name: "show_names", selector: { boolean: {} } },
-];
+// Anzeigewert im Formular, solange nichts eingestellt ist (Karte folgt dann dem Theme)
+const UI_FALLBACK = { radius: 12 };
+const COLOR_KEYS = ["title_color", "center_background", "bg_color", "text_color", "border_color"];
+const FIXED_NODES = ["solar", "home", "battery", "grid"];
 
-const MOTION_SCHEMA = [
-  { name: "speed", selector: { number: { min: 0.25, max: 4, step: 0.05, mode: "slider" } } },
-  {
-    type: "grid",
-    schema: [
-      { name: "min_flow_rate", selector: { number: { min: 0.1, max: 5, step: 0.05, mode: "box" } } },
-      { name: "max_flow_rate", selector: { number: { min: 0.5, max: 20, step: 0.25, mode: "box" } } },
-    ],
-  },
-  {
-    type: "grid",
-    schema: [
-      { name: "min_expected_power", selector: { number: { min: 0, max: 5000, step: 10, mode: "box" } } },
-      { name: "max_expected_power", selector: { number: { min: 500, max: 60000, step: 100, mode: "box" } } },
-    ],
-  },
-  {
-    type: "grid",
-    schema: [
-      { name: "dot_size", selector: { number: { min: 0.4, max: 2.5, step: 0.1, mode: "box" } } },
-      { name: "cycle_gap", selector: { number: { min: 0, max: 3, step: 0.05, mode: "box" } } },
-    ],
-  },
-  {
-    type: "grid",
-    schema: [
-      { name: "tail_length", selector: { number: { min: 0, max: 0.3, step: 0.01, mode: "slider" } } },
-      { name: "tail_segments", selector: { number: { min: 0, max: 16, step: 1, mode: "box" } } },
-    ],
-  },
-];
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+const deepGet = (obj, path) => path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
 
-const FORMAT_SCHEMA = [
-  {
-    type: "grid",
-    schema: [
-      { name: "kilo_threshold", selector: { number: { min: 0, max: 100000, step: 100, mode: "box" } } },
-      { name: "display_zero_tolerance", selector: { number: { min: 0, max: 500, step: 1, mode: "box" } } },
-    ],
-  },
-  {
-    type: "grid",
-    schema: [
-      { name: "base_decimals", selector: { number: { min: 0, max: 3, step: 1, mode: "box" } } },
-      { name: "kilo_decimals", selector: { number: { min: 0, max: 3, step: 1, mode: "box" } } },
-    ],
-  },
-  {
-    name: "display_zero_mode",
-    selector: {
-      select: {
-        mode: "dropdown",
-        options: [
-          { value: "show", label: "Linie unveraendert" },
-          { value: "grey", label: "Linie ausgrauen" },
-          { value: "transparency", label: "Linie transparent" },
-          { value: "hide", label: "Linie ausblenden" },
-        ],
-      },
-    },
-  },
-  {
-    type: "grid",
-    schema: [
-      { name: "grey_color", selector: { color_rgb: {} } },
-      { name: "transparency", selector: { number: { min: 0, max: 100, step: 5, mode: "slider" } } },
-    ],
-  },
-];
+const EDITOR_CSS = `
+  :host { display:block; }
+  .tabs { display:flex; gap:4px; padding:4px; margin-bottom:16px; border-radius:14px;
+    background: var(--secondary-background-color, rgba(127,127,127,.12)); overflow-x:auto; }
+  .tab { flex:1 1 0; min-width:62px; display:flex; flex-direction:column; align-items:center; gap:3px;
+    padding:8px 4px; border:none; border-radius:10px; background:transparent; cursor:pointer;
+    color: var(--secondary-text-color); font: inherit; font-size:12px; font-weight:500; transition: background .15s, color .15s; }
+  .tab ha-icon { --mdc-icon-size:20px; }
+  .tab:hover { color: var(--primary-text-color); }
+  .tab.active { background: var(--card-background-color, #fff); color: var(--primary-color); font-weight:600; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+  .intro { font-size:13px; color: var(--secondary-text-color); margin: 0 2px 14px; line-height:1.45; }
+  .section-title { font-size:14px; font-weight:600; margin: 18px 2px 8px; color: var(--primary-text-color); }
+  .section-title:first-child { margin-top: 0; }
+  ha-form { display:block; }
 
-const CARD_KEYS = ["title", "title_color", "title_size", "title_weight", "title_align", "card_width"];
-const CENTER_KEYS = ["center_image", "center_image_fit", "center_icon", "center_size",
-  "center_background", "center_tap_action", "center_hold_action"];
-const RING_KEYS = ["node_size", "ring_radius", "track_opacity", "ring_transition", "show_names"];
-const MOTION_KEYS = ["speed", "min_flow_rate", "max_flow_rate", "min_expected_power",
-  "max_expected_power", "dot_size", "cycle_gap", "tail_length", "tail_segments"];
+  .it-row { display:flex; align-items:center; gap:10px; padding:8px 8px 8px 10px; margin-bottom:8px; border-radius:14px;
+    border:1px solid var(--divider-color, rgba(127,127,127,.25)); background: var(--card-background-color, #fff); cursor:pointer; }
+  .it-row:hover { border-color: var(--primary-color); }
+  .it-row.hidden { opacity:.55; }
+  .it-ico { flex:0 0 auto; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; --mdc-icon-size:22px; }
+  .it-ico .rf-icon { width:22px; height:22px; }
+  .it-txt { flex:1; min-width:0; }
+  .it-name { font-weight:600; font-size:14px; color: var(--primary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .it-sub { font-size:12px; color: var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .it-tag { font-size:10px; font-weight:600; padding:1px 6px; border-radius:6px; margin-left:6px; background: var(--secondary-background-color); color: var(--secondary-text-color); }
+  .ibtn { flex:0 0 auto; width:34px; height:34px; display:flex; align-items:center; justify-content:center; border:none; border-radius:50%;
+    background:transparent; color: var(--secondary-text-color); cursor:pointer; --mdc-icon-size:20px; padding:0; }
+  .ibtn:hover { background: var(--secondary-background-color, rgba(127,127,127,.15)); color: var(--primary-text-color); }
+  .ibtn[disabled] { opacity:.3; pointer-events:none; }
+  .ibtn.del:hover { color: var(--error-color, #db4437); }
+  .add { width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:11px; margin-top:4px; border-radius:14px;
+    border:1.5px dashed var(--primary-color); background:transparent; color: var(--primary-color); font: inherit; font-weight:600; font-size:14px; cursor:pointer; }
+  .add:hover { background: color-mix(in srgb, var(--primary-color) 8%, transparent); }
+  .muted { font-size:12px; color: var(--secondary-text-color); padding: 4px 2px 10px; }
 
-const SECTION_HINTS = {
-  card: "Titel liegt über der Grafik und verschiebt sie nicht.",
-  center: "Farbe füllt den Kreis vollständig, dann entfällt der Rahmen.",
-  ring: "Knotengröße und Ringgröße wirken direkt. Nur wenn sich Knoten sonst berühren würden, bleibt die Grafik insgesamt etwas kleiner.",
-  motion: "Tempo wirkt auf alle Linien, die Abstufung nach Leistung bleibt erhalten.",
-  format: "Gilt für alle Knoten, sofern dort nichts Eigenes eingetragen ist.",
-  nodes: "Ohne Sensor bleibt ein Knoten weg. Haus rechnet sich notfalls als Bilanz.",
-};
+  .ed-head { display:flex; align-items:center; gap:6px; margin-bottom:12px; }
+  .ed-head .t { font-size:16px; font-weight:600; color: var(--primary-text-color); }
+  .pv { padding:14px; margin-bottom:16px; border-radius:14px;
+    background: repeating-conic-gradient(rgba(127,127,127,.08) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px, var(--primary-background-color, #f5f5f5); }
+  .pv-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color: var(--secondary-text-color); margin-bottom:10px; }
+  .nd { display:flex; align-items:center; gap:16px; }
+  .nd-node { position:relative; flex:0 0 auto; width:72px; height:72px; color: var(--c); }
+  .nd-node svg.ring { position:absolute; inset:0; width:100%; height:100%; transform: rotate(-90deg); }
+  .nd-ico { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; --mdc-icon-size:30px; }
+  .nd-ico .rf-icon { width:32px; height:32px; }
+  .nd-txt { min-width:0; }
+  .nd-val { font-size:22px; font-weight:600; color: var(--primary-text-color); letter-spacing:-.01em; }
+  .nd-val span { font-size:14px; font-weight:400; color: var(--secondary-text-color); margin-left:3px; }
+  .nd-name, .nd-sub { font-size:13px; color: var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+`;
 
 class RadialFlowCardEditor extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this._config = { individual: [] };
-    this._built = false;
-    this._forms = {};
+    this._tab = EDITOR_STATE.tab;
+    this._edit = null;       // { type, index } der gerade bearbeitete Knoten
+    this._paneKey = null;
   }
 
   setConfig(config) {
-    this._config = { ...config };
-    if (!this._config.individual) this._config.individual = [];
-    this._maybeRender();
+    this._config = { ...(config || {}) };
+    if (!Array.isArray(this._config.individual)) this._config.individual = [];
+    if (this._edit && this._edit.type === "individual" && !this._config.individual[this._edit.index]) this._edit = null;
+    this._refresh();
   }
 
   set hass(hass) {
+    const first = !this._hass;
     this._hass = hass;
-    Object.values(this._forms).forEach((f) => {
-      if (Array.isArray(f)) f.forEach((x) => { if (x) x.hass = hass; });
-      else if (f && f.tagName === "HA-FORM") f.hass = hass;
-    });
-    this._maybeRender();
+    if (first) this._refresh();
+    else this._pushHass();
   }
 
-  async _maybeRender() {
-    if (!this._hass || !this._config) return;
-    if (!customElements.get("ha-form")) {
-      await loadHaComponents();
-      if (!customElements.get("ha-form")) {
-        this.shadowRoot.innerHTML =
-          '<p style="padding:16px">Die Formularkomponenten von Home Assistant konnten nicht geladen werden. Bitte in YAML konfigurieren.</p>';
-        return;
-      }
+  get hass() { return this._hass; }
+
+  connectedCallback() { this._refresh(); }
+
+  /* ---------- Hilfen ---------- */
+
+  _t(path) {
+    const v = deepGet(T, path);
+    return v === undefined ? path.split(".").pop() : v;
+  }
+
+  _opts(key, values) {
+    return { select: { mode: "dropdown", options: values.map((v) => ({ value: String(v), label: this._t(`opt.${key}.${v}`) })) } };
+  }
+
+  _num(min, max, step = 1, unit = "", mode = "slider") {
+    return { number: { min, max, step, mode, ...(unit ? { unit_of_measurement: unit } : {}) } };
+  }
+
+  _group(key, icon, schema, expanded = false) {
+    return { type: "expandable", name: "", flatten: true, title: this._t(`groups.${key}`), icon, expanded, schema };
+  }
+
+  _grid(...schema) {
+    return { type: "grid", name: "", schema };
+  }
+
+  _val(key) {
+    const v = this._config?.[key];
+    if (v === undefined || v === null || v === "") return UI_FALLBACK[key] ?? DEFAULTS[key];
+    return v;
+  }
+
+  _pushHass() {
+    this.shadowRoot.querySelectorAll("ha-form").forEach((f) => { f.hass = this._hass; });
+    if (this._pv) this._renderNodePreview();
+  }
+
+  /* ---------- Schemas ---------- */
+
+  _schemaDisplay() {
+    return [
+      this._group("title", "mdi:format-title", [
+        { name: "title", selector: { text: {} } },
+        this._grid(
+          { name: "title_size", selector: this._num(8, 48, 1, "px", "box") },
+          { name: "title_weight", selector: this._opts("title_weight", [300, 400, 500, 600, 700, 800]) },
+        ),
+        this._grid(
+          { name: "title_align", selector: this._opts("title_align", ["left", "center", "right"]) },
+          { name: "title_color", selector: { color_rgb: {} } },
+        ),
+      ], true),
+      this._group("center", "mdi:circle-double", [
+        this._grid(
+          { name: "center_icon", selector: { icon: {} } },
+          { name: "center_size", selector: this._num(0.6, 1.8, 0.05, "", "box") },
+        ),
+        { name: "center_image", selector: { text: {} } },
+        ...(this._config.center_image ? [{ name: "center_image_fit", selector: this._opts("center_image_fit", ["contain", "cover"]) }] : []),
+        { name: "center_background", selector: { color_rgb: {} } },
+        { name: "center_tap_action", selector: { ui_action: {} } },
+        { name: "center_hold_action", selector: { ui_action: {} } },
+      ]),
+      this._group("ring", "mdi:vector-circle", [
+        { name: "card_width", selector: this._num(40, 100, 1, "%") },
+        { name: "node_size", selector: this._num(0.5, 1.8, 0.05) },
+        { name: "ring_radius", selector: this._num(140, 400, 5) },
+        this._grid(
+          { name: "track_opacity", selector: this._num(0, 1, 0.02, "", "box") },
+          { name: "ring_transition", selector: this._num(0, 2000, 50, "ms", "box") },
+        ),
+        { name: "show_names", selector: { boolean: {} } },
+      ], true),
+    ];
+  }
+
+  _schemaMotion() {
+    return [
+      this._group("dots", "mdi:dots-horizontal", [
+        { name: "speed", selector: this._num(0.25, 4, 0.05, "×") },
+        this._grid(
+          { name: "dot_size", selector: this._num(0.4, 2.5, 0.1, "", "box") },
+          { name: "cycle_gap", selector: this._num(0, 3, 0.05, "s", "box") },
+        ),
+        { name: "tail_length", selector: this._num(0, 0.3, 0.01) },
+        { name: "tail_segments", selector: this._num(0, 16, 1, "", "box") },
+      ], true),
+      this._group("timing", "mdi:speedometer", [
+        this._grid(
+          { name: "min_flow_rate", selector: this._num(0.1, 5, 0.05, "s", "box") },
+          { name: "max_flow_rate", selector: this._num(0.5, 20, 0.25, "s", "box") },
+        ),
+        this._grid(
+          { name: "min_expected_power", selector: this._num(0, 5000, 10, "W", "box") },
+          { name: "max_expected_power", selector: this._num(500, 60000, 100, "W", "box") },
+        ),
+      ], true),
+    ];
+  }
+
+  _schemaValues() {
+    const mode = this._formData().display_zero_mode;
+    return [
+      this._group("number", "mdi:numeric", [
+        { name: "kilo_threshold", selector: this._num(0, 100000, 100, "W", "box") },
+        this._grid(
+          { name: "base_decimals", selector: this._num(0, 3, 1, "", "box") },
+          { name: "kilo_decimals", selector: this._num(0, 3, 1, "", "box") },
+        ),
+      ], true),
+      this._group("zero", "mdi:power-plug-off-outline", [
+        { name: "display_zero_tolerance", selector: this._num(0, 500, 1, "W", "box") },
+        { name: "display_zero_mode", selector: this._opts("display_zero_mode", ["show", "grey", "transparency", "hide"]) },
+        ...(mode === "grey" ? [{ name: "grey_color", selector: { color_rgb: {} } }] : []),
+        ...(mode === "transparency" ? [{ name: "transparency", selector: this._num(0, 100, 5, "%") }] : []),
+      ], true),
+    ];
+  }
+
+  _schemaDesign() {
+    const v = (k) => this._val(k);
+    return [
+      this._group("bg", "mdi:format-color-fill", [
+        { name: "bg_mode", selector: this._opts("bg_mode", ["theme", "custom", "none"]) },
+        ...(v("bg_mode") === "custom" ? [{ name: "bg_color", selector: { color_rgb: {} } }] : []),
+        ...(v("bg_mode") !== "none" ? [{ name: "bg_opacity", selector: this._num(0, 100, 1, "%") }] : []),
+        ...(v("bg_mode") === "custom" ? [{ name: "bg_gradient", selector: { boolean: {} } }] : []),
+        { name: "blur", selector: this._num(0, 30, 1, "px") },
+      ], true),
+      this._group("text", "mdi:format-text", [
+        { name: "text_color_mode", selector: this._opts("text_color_mode", ["auto", "theme", "custom"]) },
+        ...(v("text_color_mode") === "custom" ? [{ name: "text_color", selector: { color_rgb: {} } }] : []),
+        { name: "font_scale", selector: this._num(60, 160, 5, "%") },
+      ]),
+      this._group("frame", "mdi:rounded-corner", [
+        { name: "border_mode", selector: this._opts("border_mode", ["none", "accent", "theme", "custom"]) },
+        ...(v("border_mode") === "custom" ? [{ name: "border_color", selector: { color_rgb: {} } }] : []),
+        ...(["accent", "custom"].includes(v("border_mode")) ? [{ name: "border_width", selector: this._num(1, 6, 1, "px") }] : []),
+        { name: "shadow", selector: this._opts("shadow", ["theme", "none", "soft", "strong"]) },
+        { name: "radius", selector: this._num(0, 40, 1, "px") },
+        { name: "padding", selector: this._num(0, 32, 1, "px") },
+      ]),
+    ];
+  }
+
+  _schemaNode(type, data) {
+    const sensor = [{ name: "entity", selector: POWER_ENTITY }];
+    if (type === "grid" || type === "battery") {
+      sensor.push(this._grid({ name: "entity_a", selector: POWER_ENTITY }, { name: "entity_b", selector: POWER_ENTITY }));
     }
-    const count = (this._config.individual || []).length;
-    if (!this._built || this._individualCount !== count) this._build();
-    else this._sync();
+    sensor.push({ name: "invert", selector: { boolean: {} } });
+
+    const values = [
+      this._grid(
+        { name: "unit", selector: { text: {} } },
+        { name: "decimals", selector: this._num(0, 4, 1, "", "box") },
+      ),
+    ];
+    if (type !== "home") values.push({ name: "max_power", selector: this._num(0, 60000, 100, "W", "box") });
+
+    const s = [
+      this._group("sensor", "mdi:flash-outline", sensor, true),
+      this._group("look", "mdi:palette-swatch-outline", [
+        this._grid({ name: "name", selector: { text: {} } }, { name: "icon", selector: { icon: {} } }),
+        { name: "color", selector: { color_rgb: {} } },
+      ], true),
+      this._group("node_values", "mdi:numeric", values),
+    ];
+
+    if (type === "battery") {
+      s.push(this._group("soc", "mdi:battery-charging-outline", [
+        { name: "state_of_charge", selector: { entity: {} } },
+        ...(data.state_of_charge ? [{ name: "ring_source", selector: this._opts("ring_source", ["soc", "power"]) }] : []),
+      ]));
+    }
+    if (type === "individual") {
+      s.push(this._group("soc", "mdi:battery-charging-outline", [
+        { name: "state_of_charge", selector: { entity: {} } },
+        ...(data.state_of_charge ? [
+          this._grid(
+            { name: "soc_display", selector: this._opts("soc_display", ["battery", "ring", "none"]) },
+            { name: "soc_color", selector: { color_rgb: {} } },
+          ),
+          { name: "charging_entity", selector: { entity: {} } },
+          { name: "charging_state", selector: { text: {} } },
+        ] : []),
+      ]));
+      s.push(this._group("behaviour", "mdi:cog-outline", [{ name: "subtract_from_home", selector: { boolean: {} } }]));
+    }
+    if (type === "home") {
+      s.push(this._group("behaviour", "mdi:cog-outline", [{ name: "subtract_individual", selector: { boolean: {} } }]));
+    }
+
+    s.push(this._group("extra", "mdi:information-outline", [
+      { name: "secondary_entity", selector: { entity: {} } },
+      ...(data.secondary_entity ? [{ name: "secondary_unit", selector: { text: {} } }] : []),
+      { name: "note", selector: { text: {} } },
+    ]));
+    s.push(this._group("actions", "mdi:gesture-tap", [
+      { name: "tap_action", selector: { ui_action: {} } },
+      { name: "hold_action", selector: { ui_action: {} } },
+      { name: "double_tap_action", selector: { ui_action: {} } },
+    ]));
+    return s;
   }
 
-  _build() {
-    this._individualCount = (this._config.individual || []).length;
-    this.shadowRoot.innerHTML = `
-      <style>
-        .box { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 8px; }
-        .group { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
-                 color: var(--secondary-text-color); margin: 14px 2px 2px; }
-        .group:first-child { margin-top: 4px; }
-        ha-expansion-panel { --expansion-panel-content-padding: 0 12px 12px; border-radius: 8px; }
-        .panel-body { padding-top: 8px; }
-        .hint { font-size: 12px; line-height: 1.5; color: var(--secondary-text-color); margin: 2px 0 10px; }
-        .row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
-        .del { background: none; border: none; color: var(--error-color, #db4437); cursor: pointer; font: inherit; padding: 4px 0; }
-        .move { background: none; border: none; color: var(--primary-color); cursor: pointer; font: inherit; padding: 4px 0; }
-        .move[disabled] { color: var(--disabled-text-color); cursor: default; }
-        .add { background: none; border: 1px dashed var(--divider-color); border-radius: 8px;
-               color: var(--primary-color); cursor: pointer; font: inherit; padding: 10px; width: 100%; }
-      </style>
-      <div class="box" id="root"></div>`;
+  /* ---------- Formulardaten ---------- */
 
-    const root = this.shadowRoot.getElementById("root");
-    this._forms = {};
-
-    const group = (label) => {
-      const d = document.createElement("div");
-      d.className = "group";
-      d.textContent = label;
-      root.appendChild(d);
-    };
-
-    const section = (header, key, schema, data, onChange, hint, expanded) => {
-      const body = document.createElement("div");
-      body.className = "panel-body";
-      if (hint) {
-        const h = document.createElement("p");
-        h.className = "hint";
-        h.textContent = hint;
-        body.appendChild(h);
-      }
-      body.appendChild(this._form(key, schema, data, onChange));
-      root.appendChild(this._panel(header, body, expanded));
-    };
-
-    /* ---- 1. Sensoren ---- */
-    group("Sensoren");
-    ["solar", "grid", "battery", "home"].forEach((type, idx) => {
-      const body = document.createElement("div");
-      body.className = "panel-body";
-      if (idx === 0) {
-        const h = document.createElement("p");
-        h.className = "hint";
-        h.textContent = SECTION_HINTS.nodes;
-        body.appendChild(h);
-      }
-      body.appendChild(
-        this._form(type, nodeSchema(type), this._nodeData(this._config[type]),
-          (v) => this._onNode(type, v), NODE_LABEL_OVERRIDES[type])
-      );
-      if (type !== "home" && this._config[type]) {
-        const row = document.createElement("div");
-        row.className = "row";
-        const del = document.createElement("button");
-        del.className = "del";
-        del.textContent = "Knoten entfernen";
-        del.addEventListener("click", () => {
-          const cfg = { ...this._config };
-          delete cfg[type];
-          this._commit(cfg, true);
-        });
-        row.appendChild(del);
-        body.appendChild(row);
-      }
-      root.appendChild(this._panel(NODE_LABELS[type], body, idx === 0 && !this._config.solar));
+  // Alle globalen Werte inkl. Standard, damit Regler/Auswahl den echten Wert zeigen
+  _formData() {
+    const d = {};
+    Object.keys(DEFAULTS).forEach((k) => {
+      if (k === "display_zero_lines") return;
+      const v = this._val(k);
+      if (v === null || v === undefined) return;
+      d[k] = COLOR_KEYS.includes(k) ? (rgbOf(v) || v) : v;
     });
-
-    /* ---- 2. Verbraucher ---- */
-    group("Verbraucher");
-    const forms = [];
-    (this._config.individual || []).forEach((ind, i) => {
-      const body = document.createElement("div");
-      body.className = "panel-body";
-      const form = this._form(`ind${i}`, nodeSchema("individual"), this._nodeData(ind),
-        (v) => this._onIndividual(i, v));
-      forms.push(form);
-      body.appendChild(form);
-
-      const row = document.createElement("div");
-      row.className = "row";
-      const move = (delta) => {
-        const list = [...this._config.individual];
-        const target = i + delta;
-        if (target < 0 || target >= list.length) return;
-        [list[i], list[target]] = [list[target], list[i]];
-        this._commit({ ...this._config, individual: list }, true);
-      };
-      const up = document.createElement("button");
-      up.className = "move";
-      up.textContent = "\u2191 nach vorn";
-      up.disabled = i === 0;
-      up.addEventListener("click", () => move(-1));
-      const down = document.createElement("button");
-      down.className = "move";
-      down.textContent = "\u2193 nach hinten";
-      down.disabled = i === this._config.individual.length - 1;
-      down.addEventListener("click", () => move(1));
-      const del = document.createElement("button");
-      del.className = "del";
-      del.textContent = "Entfernen";
-      del.addEventListener("click", () => {
-        const list = [...this._config.individual];
-        list.splice(i, 1);
-        this._commit({ ...this._config, individual: list }, true);
-      });
-      row.appendChild(up);
-      row.appendChild(down);
-      row.appendChild(del);
-      body.appendChild(row);
-
-      const label = `${i + 1}. ` + (
-        ind.name ||
-        (typeof ind.entity === "string" && this._hass.states[ind.entity]?.attributes.friendly_name) ||
-        "Verbraucher"
-      );
-      root.appendChild(this._panel(label, body));
-    });
-    this._forms.individual = forms;
-
-    const add = document.createElement("button");
-    add.className = "add";
-    add.textContent = "+ Verbraucher hinzuf\u00fcgen";
-    add.addEventListener("click", () => {
-      const list = [...(this._config.individual || []), { entity: "" }];
-      this._commit({ ...this._config, individual: list }, true);
-    });
-    root.appendChild(add);
-
-    /* ---- 3. Aussehen ---- */
-    group("Aussehen");
-    section("Karte & Titel", "card", CARD_SCHEMA, this._pick(CARD_KEYS),
-      (v) => this._onGroup(v), SECTION_HINTS.card);
-    section("Mitte", "center", CENTER_SCHEMA, this._pick(CENTER_KEYS),
-      (v) => this._onGroup(v), SECTION_HINTS.center);
-    section("Knoten & Ringe", "ring", RING_SCHEMA, this._pick(RING_KEYS),
-      (v) => this._onGroup(v), SECTION_HINTS.ring);
-
-    /* ---- 4. Bewegung und Zahlen ---- */
-    group("Bewegung & Zahlen");
-    section("Punkte", "motion", MOTION_SCHEMA, this._pick(MOTION_KEYS),
-      (v) => this._onGroup(v), SECTION_HINTS.motion);
-    section("Werte & Einheiten", "format", FORMAT_SCHEMA, this._formatData(),
-      (v) => this._onFormat(v), SECTION_HINTS.format);
-
-    this._built = true;
-  }
-
-  _panel(header, content, expanded) {
-    const p = document.createElement("ha-expansion-panel");
-    p.outlined = true;
-    p.setAttribute("header", header);
-    if (expanded) p.expanded = true;
-    p.appendChild(content);
-    return p;
-  }
-
-  _form(key, schema, data, onChange, overrides) {
-    const form = document.createElement("ha-form");
-    form.hass = this._hass;
-    form.schema = schema;
-    form.data = data;
-    form.computeLabel = (s) => (overrides && overrides[s.name]) || LABELS[s.name] || s.name;
-    form.addEventListener("value-changed", (e) => {
-      e.stopPropagation();
-      onChange(e.detail.value);
-    });
-    this._forms[key] = form;
-    return form;
-  }
-
-  _pick(keys) {
-    const c = { ...DEFAULTS, ...this._config };
-    const out = {};
-    keys.forEach((k) => {
-      const v = c[k] ?? DEFAULTS[k];
-      out[k] = v === null ? undefined : v;
-    });
-    return out;
-  }
-
-  _formatData() {
-    const c = { ...DEFAULTS, ...this._config };
+    d.title_weight = String(d.title_weight);
     const dz = { ...DEFAULTS.display_zero_lines, ...(this._config.display_zero_lines || {}) };
-    return {
-      kilo_threshold: c.kilo_threshold,
-      display_zero_tolerance: c.display_zero_tolerance,
-      base_decimals: c.base_decimals,
-      kilo_decimals: c.kilo_decimals,
-      display_zero_mode: dz.mode,
-      grey_color: dz.grey_color,
-      transparency: dz.transparency,
-    };
+    d.display_zero_mode = dz.mode;
+    d.grey_color = rgbOf(dz.grey_color) || dz.grey_color;
+    d.transparency = dz.transparency;
+    return d;
   }
 
-  _nodeData(node) {
-    const n = typeof node === "string" ? { entity: node } : { ...(node || {}) };
+  _nodeCfg(type, index) {
+    return type === "individual" ? (this._config.individual || [])[index] : this._config[type];
+  }
+
+  _nodeObj(type, index) {
+    const node = this._nodeCfg(type, index);
+    return typeof node === "string" ? { entity: node } : { ...(node || {}) };
+  }
+
+  _nodeData(type, n) {
     const data = { ...n };
     if (n.entity && typeof n.entity === "object") {
       data.entity = "";
       data.entity_a = n.entity.consumption || n.entity.discharge || "";
       data.entity_b = n.entity.production || n.entity.charge || "";
     }
-    if (data.soc_display === undefined) data.soc_display = "battery";
+    ["color", "soc_color"].forEach((k) => { if (data[k] !== undefined) data[k] = rgbOf(data[k]) || data[k]; });
+    if (type === "individual") {
+      if (data.soc_display === undefined) data.soc_display = "battery";
+      data.subtract_from_home = n.subtract_from_home !== false;
+    }
+    if (type === "home") data.subtract_individual = n.subtract_individual !== false;
+    if (type === "battery" && data.ring_source === undefined) data.ring_source = "soc";
     // Liste aus YAML im Textfeld als kommagetrennte Angabe zeigen
     if (Array.isArray(data.charging_state)) data.charging_state = data.charging_state.join(", ");
     return data;
   }
 
-  _nodeConfig(data, type) {
+  _nodeConfig(data, type, orig) {
     const out = {};
     const put = (k, v) => {
       if (v === undefined || v === null || v === "") return;
@@ -1660,74 +1661,383 @@ class RadialFlowCardEditor extends HTMLElement {
     } else {
       put("entity", data.entity);
     }
-    ["name", "icon", "color", "unit", "note", "secondary_entity", "secondary_unit",
-     "state_of_charge", "ring_source"].forEach((k) => put(k, data[k]));
+    ["name", "icon", "unit", "note", "secondary_entity", "secondary_unit",
+     "state_of_charge"].forEach((k) => put(k, data[k]));
+    // Unveränderte Farben im ursprünglichen Format (z. B. Hex) belassen
+    ["color", "soc_color"].forEach((k) => {
+      if (Array.isArray(data[k]) && orig[k] !== undefined && sameRgb(orig[k], data[k])) data[k] = orig[k];
+    });
+    put("color", data.color);
+    if (type === "battery" && data.ring_source === "power") out.ring_source = "power";
     if (type === "individual") {
       // Anzeige nur speichern, wenn sie vom Standard (Batteriesymbol) abweicht
       if (data.soc_display && data.soc_display !== "battery") out.soc_display = data.soc_display;
       put("soc_color", data.soc_color);
       put("charging_entity", data.charging_entity);
       put("charging_state", data.charging_state);
+      if (data.subtract_from_home === false) out.subtract_from_home = false;
     }
     if (data.max_power) out.max_power = data.max_power;
-    if (type === "individual" && data.subtract_from_home === false) out.subtract_from_home = false;
     if (data.decimals !== undefined && data.decimals !== null && data.decimals !== "") out.decimals = data.decimals;
     if (data.invert) out.invert = true;
     if (type === "home" && data.subtract_individual === false) out.subtract_individual = false;
     ["tap_action", "hold_action", "double_tap_action"].forEach((k) => {
       if (data[k] && data[k].action && data[k].action !== "none") out[k] = data[k];
     });
+    if (!out.secondary_entity) delete out.secondary_unit;
     return out;
   }
 
-  _onGroup(v) {
-    const cfg = { ...this._config };
-    Object.keys(v).forEach((k) => {
-      const val = v[k];
-      cfg[k] = val === "" || val === null ? undefined : val;
-    });
-    this._commit(cfg);
+  _nodeColor(type, index, n) {
+    const fallback = type === "individual" ? INDIVIDUAL_PALETTE[index % INDIVIDUAL_PALETTE.length] : PALETTE[type];
+    return toColor(n.color, fallback);
   }
 
-  _onFormat(v) {
-    const cfg = { ...this._config };
-    ["kilo_threshold", "display_zero_tolerance", "base_decimals", "kilo_decimals"].forEach((k) => {
-      cfg[k] = v[k];
+  _nodeName(type, index, n) {
+    if (n.name) return n.name;
+    if (type !== "individual") return this._t(`node_types.${type}`);
+    const id = firstEntityId(n.entity);
+    return (id && this._hass?.states[id]?.attributes.friendly_name) || `${this._t("node_types.individual")} ${index + 1}`;
+  }
+
+  _iconHtml(icon, fallback) {
+    const ic = icon || fallback;
+    return typeof ic === "string" && ic.startsWith("rf:") ? iconMarkup(ic) : `<ha-icon icon="${esc(ic)}"></ha-icon>`;
+  }
+
+  /* ---------- Rendering ---------- */
+
+  async _refresh() {
+    if (!this._config || !this._hass) return;
+    if (!this._built) {
+      if (!customElements.get("ha-form")) {
+        if (this._loading) return;
+        this._loading = true;
+        await loadHaComponents();
+        this._loading = false;
+        if (!customElements.get("ha-form")) {
+          this.shadowRoot.innerHTML =
+            '<p style="padding:16px">Die Formularkomponenten von Home Assistant konnten nicht geladen werden. Bitte in YAML konfigurieren.</p>';
+          return;
+        }
+      }
+      this._build();
+    }
+    this._tabsEl.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === this._tab));
+    const key = `${this._tab}:${this._edit ? `${this._edit.type}${this._edit.index}` : ""}`;
+    if (key !== this._paneKey) { this._paneKey = key; this._renderPane(); }
+    this._updatePane();
+  }
+
+  _build() {
+    this._built = true;
+    this.shadowRoot.innerHTML = `<style>${EDITOR_CSS}</style><div class="tabs"></div><div class="pane"></div>`;
+    this._tabsEl = this.shadowRoot.querySelector(".tabs");
+    this._paneEl = this.shadowRoot.querySelector(".pane");
+    EDITOR_TABS.forEach((tab) => {
+      const b = document.createElement("button");
+      b.className = "tab";
+      b.type = "button";
+      b.dataset.tab = tab.id;
+      b.innerHTML = `<ha-icon icon="${tab.icon}"></ha-icon><span>${esc(this._t(`tabs.${tab.id}`))}</span>`;
+      b.addEventListener("click", () => {
+        this._tab = tab.id;
+        EDITOR_STATE.tab = tab.id;
+        this._edit = null;
+        this._refresh();
+      });
+      this._tabsEl.appendChild(b);
     });
-    cfg.display_zero_lines = {
-      mode: v.display_zero_mode,
-      grey_color: v.grey_color,
-      transparency: v.transparency,
+  }
+
+  _makeForm(onChange, labels, helpers) {
+    const f = document.createElement("ha-form");
+    f.hass = this._hass;
+    f.computeLabel = (s) => (s.name ? ((labels && labels[s.name]) || this._t(`fields.${s.name}`)) : "");
+    f.computeHelper = (s) => (s.name && ((helpers && helpers[s.name]) || deepGet(T, `helpers.${s.name}`))) || "";
+    f.addEventListener("value-changed", (ev) => { ev.stopPropagation(); onChange(ev.detail.value); });
+    return f;
+  }
+
+  _renderPane() {
+    const pane = this._paneEl;
+    pane.innerHTML = "";
+    this._form = null; this._nodeForm = null; this._list = null; this._pv = null; this._edTitle = null;
+
+    if (this._tab === "nodes" && this._edit) { this._renderNodeEditor(pane); return; }
+
+    const intro = document.createElement("div");
+    intro.className = "intro";
+    intro.textContent = this._t(`intro.${this._tab}`);
+    pane.appendChild(intro);
+
+    if (this._tab === "nodes") {
+      this._list = document.createElement("div");
+      pane.appendChild(this._list);
+      return;
+    }
+    this._form = this._makeForm((value) => this._emitGlobal(value));
+    pane.appendChild(this._form);
+  }
+
+  _renderNodeEditor(pane) {
+    const { type } = this._edit;
+    const head = document.createElement("div");
+    head.className = "ed-head";
+    head.innerHTML = `<button class="ibtn back" type="button" title="${esc(this._t("back"))}"><ha-icon icon="mdi:arrow-left"></ha-icon></button><span class="t"></span>`;
+    head.querySelector(".back").addEventListener("click", () => { this._edit = null; this._refresh(); });
+    this._edTitle = head.querySelector(".t");
+    pane.appendChild(head);
+
+    this._pv = document.createElement("div");
+    this._pv.className = "pv";
+    pane.appendChild(this._pv);
+
+    const helpers = T.node_helpers[type] || T.node_helpers.default;
+    this._nodeForm = this._makeForm((value) => this._nodeChanged(value), NODE_LABEL_OVERRIDES[type], helpers);
+    pane.appendChild(this._nodeForm);
+  }
+
+  _updatePane() {
+    if (this._form) {
+      const schemas = {
+        display: () => this._schemaDisplay(),
+        motion: () => this._schemaMotion(),
+        values: () => this._schemaValues(),
+        design: () => this._schemaDesign(),
+      };
+      this._form.hass = this._hass;
+      this._form.schema = schemas[this._tab]();
+      this._form.data = this._formData();
+    }
+    if (this._list) this._renderNodeList();
+    if (this._nodeForm) {
+      const { type, index } = this._edit;
+      const n = this._nodeObj(type, index);
+      const data = this._nodeData(type, n);
+      this._nodeForm.hass = this._hass;
+      this._nodeForm.schema = this._schemaNode(type, data);
+      this._nodeForm.data = data;
+      this._edTitle.textContent = `${this._nodeName(type, index, n)} ${this._t("edit_node")}`;
+      this._renderNodePreview();
+    }
+  }
+
+  _nodeRow(type, index) {
+    const raw = this._nodeCfg(type, index);
+    const n = this._nodeObj(type, index);
+    const configured = type === "individual" || type === "home" || !!raw;
+    const color = this._nodeColor(type, index, n);
+
+    let sub;
+    if (!configured) sub = this._t("not_set");
+    else if (n.entity && typeof n.entity === "object") {
+      sub = [n.entity.consumption || n.entity.discharge, n.entity.production || n.entity.charge].filter(Boolean).join(" / ");
+    } else if (n.entity) sub = n.entity;
+    else sub = type === "home" ? this._t("balance") : this._t("no_entity");
+
+    const tags = [];
+    if (type !== "individual" && n.name) tags.push(this._t(`node_types.${type}`));
+    if (n.state_of_charge && n.soc_display !== "none") tags.push(this._t("tag_soc"));
+    if (!configured) tags.push(this._t("tag_off"));
+
+    const count = (this._config.individual || []).length;
+    const btn = (a, icon, title, disabled, cls = "") =>
+      `<button class="ibtn ${cls}" type="button" data-a="${a}" title="${esc(title)}" ${disabled ? "disabled" : ""}><ha-icon icon="${icon}"></ha-icon></button>`;
+    let buttons = "";
+    if (type === "individual") {
+      buttons += btn("up", "mdi:chevron-up", this._t("move_up"), index === 0);
+      buttons += btn("down", "mdi:chevron-down", this._t("move_down"), index === count - 1);
+    }
+    buttons += btn("edit", "mdi:pencil-outline", this._t("edit"), false);
+    if (type === "individual" || (type !== "home" && configured)) {
+      buttons += btn("del", "mdi:delete-outline", this._t("delete"), false, "del");
+    }
+
+    const row = document.createElement("div");
+    row.className = `it-row${configured ? "" : " hidden"}`;
+    row.innerHTML = `
+      <div class="it-ico" style="background:${withAlpha(color, 20)};color:${color}">${this._iconHtml(n.icon, DEFAULT_ICONS[type])}</div>
+      <div class="it-txt">
+        <div class="it-name">${esc(this._nodeName(type, index, n))}${tags.map((t) => `<span class="it-tag">${esc(t)}</span>`).join("")}</div>
+        <div class="it-sub">${esc(sub)}</div>
+      </div>
+      ${buttons}`;
+    row.addEventListener("click", (ev) => {
+      const b = ev.composedPath().find((el) => el.dataset && el.dataset.a);
+      ev.stopPropagation();
+      this._nodeAction(b ? b.dataset.a : "edit", type, index);
+    });
+    return row;
+  }
+
+  _renderNodeList() {
+    const list = this._list;
+    list.innerHTML = "";
+    const title = (txt) => {
+      const d = document.createElement("div");
+      d.className = "section-title";
+      d.textContent = txt;
+      list.appendChild(d);
     };
-    this._commit(cfg);
+
+    title(this._t("sections.sources"));
+    FIXED_NODES.forEach((type) => list.appendChild(this._nodeRow(type, 0)));
+
+    title(this._t("sections.consumers"));
+    const inds = this._config.individual || [];
+    if (!inds.length) {
+      const m = document.createElement("div");
+      m.className = "muted";
+      m.textContent = this._t("no_consumers");
+      list.appendChild(m);
+    }
+    inds.forEach((_, i) => list.appendChild(this._nodeRow("individual", i)));
+
+    const add = document.createElement("button");
+    add.className = "add";
+    add.type = "button";
+    add.innerHTML = `<ha-icon icon="mdi:plus"></ha-icon>${esc(this._t("add_consumer"))}`;
+    add.addEventListener("click", () => {
+      const listCfg = [...inds, {}];
+      this._edit = { type: "individual", index: listCfg.length - 1 };
+      this._commit({ ...this._config, individual: listCfg });
+    });
+    list.appendChild(add);
   }
 
-  _onNode(type, v) {
+  _renderNodePreview() {
+    if (!this._pv || !this._edit || !this._hass) return;
+    const { type, index } = this._edit;
+    const n = this._nodeObj(type, index);
+    const c = { ...DEFAULTS, ...this._config };
+    const color = this._nodeColor(type, index, n);
+
+    let valTxt = "–";
+    let unitTxt = "";
+    let pct = 1;
+    if (n.entity) {
+      const w = Math.abs(readEntity(this._hass, n.entity, !!n.invert));
+      const u = n.unit;
+      const dec = n.decimals;
+      if (u === "W") [valTxt, unitTxt] = [w.toFixed(dec ?? c.base_decimals), "W"];
+      else if (u === "kW") [valTxt, unitTxt] = [(w / 1000).toFixed(dec ?? c.kilo_decimals), "kW"];
+      else if (u) [valTxt, unitTxt] = [w.toFixed(dec ?? 1), u];
+      else if (w >= c.kilo_threshold) [valTxt, unitTxt] = [(w / 1000).toFixed(dec ?? c.kilo_decimals), "kW"];
+      else [valTxt, unitTxt] = [w.toFixed(dec ?? c.base_decimals), "W"];
+      if (type === "battery" && n.ring_source !== "power" && n.state_of_charge && this._hass.states[n.state_of_charge]) {
+        pct = clamp(num(this._hass.states[n.state_of_charge].state) / 100, 0, 1);
+      } else if (n.max_power > 0) pct = clamp(w / n.max_power, 0, 1);
+    }
+
+    const r = 44;
+    const circ = 2 * Math.PI * r;
+    const sub = n.entity ? (typeof n.entity === "object" ? Object.values(n.entity).join(" / ") : n.entity)
+      : (type === "home" ? this._t("balance") : this._t("no_entity"));
+    this._pv.innerHTML = `
+      <div class="pv-label">${esc(this._t("preview"))}</div>
+      <div class="nd">
+        <div class="nd-node" style="--c:${color}">
+          <svg class="ring" viewBox="0 0 100 100" fill="none">
+            <circle cx="50" cy="50" r="${r}" stroke="${color}" stroke-opacity="${clamp(c.track_opacity, 0, 1)}" stroke-width="7"/>
+            <circle cx="50" cy="50" r="${r}" stroke="${color}" stroke-width="7" stroke-linecap="round"
+              stroke-dasharray="${circ.toFixed(1)} ${circ.toFixed(1)}" stroke-dashoffset="${((1 - pct) * circ).toFixed(1)}"
+              stroke-opacity="${pct < 0.004 ? 0 : 1}"/>
+          </svg>
+          <div class="nd-ico">${this._iconHtml(n.icon, DEFAULT_ICONS[type])}</div>
+        </div>
+        <div class="nd-txt">
+          <div class="nd-val">${esc(valTxt)}${unitTxt ? `<span>${esc(unitTxt)}</span>` : ""}</div>
+          <div class="nd-name">${esc(this._nodeName(type, index, n))}</div>
+          <div class="nd-sub">${esc(sub)}</div>
+        </div>
+      </div>`;
+  }
+
+  /* ---------- Aktionen ---------- */
+
+  _nodeAction(action, type, index) {
+    if (action === "edit") {
+      this._edit = { type, index };
+      this._refresh();
+      return;
+    }
     const cfg = { ...this._config };
-    cfg[type] = this._nodeConfig(v, type);
+    if (type === "individual") {
+      const list = [...(cfg.individual || [])];
+      if (action === "up" && index > 0) [list[index - 1], list[index]] = [list[index], list[index - 1]];
+      else if (action === "down" && index < list.length - 1) [list[index + 1], list[index]] = [list[index], list[index + 1]];
+      else if (action === "del") list.splice(index, 1);
+      else return;
+      cfg.individual = list;
+    } else if (action === "del") {
+      delete cfg[type];
+    } else return;
     this._commit(cfg);
   }
 
-  _onIndividual(index, v) {
-    const list = [...(this._config.individual || [])];
-    list[index] = this._nodeConfig(v, "individual");
-    this._commit({ ...this._config, individual: list });
+  _nodeChanged(value) {
+    const { type, index } = this._edit;
+    const node = this._nodeConfig(value, type, this._nodeObj(type, index));
+    const cfg = { ...this._config };
+    if (type === "individual") {
+      const list = [...(cfg.individual || [])];
+      list[index] = node;
+      cfg.individual = list;
+    } else if (Object.keys(node).length) {
+      cfg[type] = node;
+    } else {
+      delete cfg[type];
+    }
+    this._commit(cfg);
   }
 
-  _commit(config, restructure) {
+  _emitGlobal(value) {
+    const cfg = { ...this._config };
+    Object.keys(DEFAULTS).forEach((k) => {
+      if (k === "display_zero_lines") return;
+      let v = value[k];
+      if (v === undefined || v === null || v === "") { delete cfg[k]; return; }
+      if (k === "title_weight") v = Number(v);
+      const orig = this._config[k];
+      // Unveränderte Farben im ursprünglichen Format (z. B. Hex) belassen
+      if (COLOR_KEYS.includes(k) && Array.isArray(v) && orig !== undefined && sameRgb(orig, v)) v = orig;
+      const def = UI_FALLBACK[k] ?? DEFAULTS[k];
+      // Werte, die dem Standard entsprechen, nicht in die YAML schreiben
+      if (orig === undefined && JSON.stringify(v) === JSON.stringify(def)) { delete cfg[k]; return; }
+      cfg[k] = v;
+    });
+
+    const dzDef = DEFAULTS.display_zero_lines;
+    const dzOrig = this._config.display_zero_lines || {};
+    const dz = {};
+    [["mode", "display_zero_mode"], ["grey_color", "grey_color"], ["transparency", "transparency"]].forEach(([key, field]) => {
+      let v = value[field];
+      if (v === undefined || v === null || v === "") return;
+      const base = dzOrig[key] ?? dzDef[key];
+      if (key === "grey_color" && Array.isArray(v) && sameRgb(base, v)) v = base;
+      if (dzOrig[key] === undefined && JSON.stringify(v) === JSON.stringify(dzDef[key])) return;
+      dz[key] = v;
+    });
+    if (Object.keys(dz).length) cfg.display_zero_lines = dz;
+    else delete cfg.display_zero_lines;
+
+    // Abhängige Werte entfernen, wenn der zugehörige Modus sie nicht nutzt
+    if (cfg.bg_mode !== "custom") { delete cfg.bg_color; delete cfg.bg_gradient; }
+    if (cfg.bg_mode === "none") delete cfg.bg_opacity;
+    if (cfg.text_color_mode !== "custom") delete cfg.text_color;
+    if (cfg.border_mode !== "custom") delete cfg.border_color;
+    if (!["accent", "custom"].includes(cfg.border_mode)) delete cfg.border_width;
+    if (!cfg.center_image) delete cfg.center_image_fit;
+    this._commit(cfg);
+  }
+
+  _commit(config) {
     const clean = { ...config };
     Object.keys(clean).forEach((k) => { if (clean[k] === undefined) delete clean[k]; });
     this._config = clean;
     fire(this, "config-changed", { config: clean });
-    if (restructure) { this._built = false; this._maybeRender(); }
-  }
-
-  _sync() {
-    const map = { card: CARD_KEYS, center: CENTER_KEYS, ring: RING_KEYS, motion: MOTION_KEYS };
-    Object.keys(map).forEach((k) => {
-      if (this._forms[k]) this._forms[k].data = this._pick(map[k]);
-    });
-    if (this._forms.format) this._forms.format.data = this._formatData();
+    this._refresh();
   }
 }
 

@@ -20,7 +20,8 @@ Karte ohne Abhängigkeiten, ohne Build-Schritt, mit vollständigem Editor.
 - Getrennte Sensoren für Bezug/Einspeisung und Laden/Entladen möglich
 - Ladestand je Verbraucher, etwa das Auto an der Wallbox: als Batteriesymbol oder als innerer Ring
 - Eigener Icon-Satz für Wärmepumpen und Heizung
-- Vollständiger Konfigurationseditor, YAML optional
+- Vollständiger Konfigurationseditor im gleichen Stil wie Status-Übersicht und Trash Card Plus, YAML optional
+- Hintergrund, Transparenz, Glas-Effekt, Rahmen und Schatten frei einstellbar
 
 ## Installation
 
@@ -170,16 +171,24 @@ hier lohnt sich eher ein zweites Dashboard als noch mehr Verbraucher.
 
 ## Konfigurationseditor
 
-Der Editor nutzt dieselben Komponenten wie die eingebauten Karten, also
-`ha-entity-picker` für Sensoren, den Icon- und Farbwähler und den Standard-Dialog
-für Aktionen. Er ist in vier Gruppen geteilt:
+Der Editor ist genauso aufgebaut wie bei der
+[Status-Übersicht-Karte](https://github.com/Kohle93/Status-Summary-Card) und der
+[Trash Card Plus](https://github.com/Kohle93/trash-card-plus): Tab-Leiste oben,
+eine kurze Einleitung je Tab und aufklappbare Gruppen mit Symbol. Er nutzt die
+Komponenten der eingebauten Karten, also `ha-entity-picker`, Icon- und Farbwähler
+und den Standard-Dialog für Aktionen.
 
-| Gruppe | Inhalt |
+| Tab | Inhalt |
 |---|---|
-| Sensoren | PV, Netz, Speicher, Haus |
-| Verbraucher | beliebig viele, mit Reihenfolge und Entfernen |
-| Aussehen | Karte & Titel, Mitte, Knoten & Ringe |
-| Bewegung & Zahlen | Punkte, Werte & Einheiten |
+| Knoten | Liste aller Knoten (PV, Haus, Speicher, Netz, Verbraucher) mit Sortieren, Entfernen und eigener Bearbeiten-Seite samt Live-Vorschau |
+| Anzeige | Titel, Mitte, Knoten & Ring |
+| Animation | Punkte & Schweif, Tempo nach Leistung |
+| Werte | Zahlenformat, Darstellung bei 0 W |
+| Design | Hintergrund & Transparenz, Text, Rahmen, Form & Abstände |
+
+Auf der Bearbeiten-Seite eines Knotens sind die Felder in Sensor, Name/Symbol/Farbe,
+Werte & Ring, Ladestand, Verhalten, Zusatzinfo und Aktionen gegliedert. Werte,
+die dem Standard entsprechen, landen nicht in der YAML.
 
 ## Optionen
 
@@ -219,6 +228,36 @@ für Aktionen. Er ist in vier Gruppen geteilt:
 | `display_zero_lines.mode` | string | `show` | `show`, `grey`, `transparency`, `hide` |
 | `display_zero_lines.grey_color` | string | `#4e5867` | Farbe im Grau-Modus |
 | `display_zero_lines.transparency` | number | `50` | Prozent im Transparenz-Modus, wirkt auf die Linie inaktiver Knoten |
+
+### Design
+
+Dasselbe System wie bei der Status-Übersicht-Karte und der Trash Card Plus.
+
+| Option | Typ | Standard | Bedeutung |
+|---|---|---|---|
+| `bg_mode` | string | `theme` | `theme` (Karten-Hintergrund), `custom` (eigene Farbe), `none` (transparent) |
+| `bg_color` | string \| [r,g,b] | – | Farbe bei `bg_mode: custom` |
+| `bg_opacity` | number | `100` | Deckkraft des Hintergrunds in % |
+| `bg_gradient` | bool | `false` | Farbverlauf bei eigener Farbe |
+| `blur` | number | `0` | Unschärfe hinter der Karte in px (Glas-Effekt) |
+| `text_color_mode` | string | `auto` | `auto` (Kontrast zu kräftigem Hintergrund), `theme`, `custom` |
+| `text_color` | string \| [r,g,b] | – | Farbe bei `text_color_mode: custom` |
+| `font_scale` | number | `100` | Schriftgröße der Werte, Einheiten und Namen in % |
+| `border_mode` | string | `theme` | `none`, `accent`, `theme` (normaler Rahmen des Themes), `custom` |
+| `border_color` | string \| [r,g,b] | – | Farbe bei `border_mode: custom` |
+| `border_width` | number | `1` | Rahmenstärke in px bei `accent`/`custom` |
+| `shadow` | string | `theme` | `theme`, `none`, `soft`, `strong` |
+| `radius` | number | Theme | Eckenradius in px |
+| `padding` | number | `8` | Innenabstand in px |
+
+```yaml
+# Glas-Optik
+bg_mode: theme
+bg_opacity: 40
+blur: 12
+border_mode: none
+radius: 24
+```
 
 ### Knoten
 
