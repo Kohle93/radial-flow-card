@@ -20,6 +20,7 @@ Karte ohne Abhängigkeiten, ohne Build-Schritt, mit vollständigem Editor.
 - Getrennte Sensoren für Bezug/Einspeisung und Laden/Entladen möglich
 - Ladestand je Verbraucher, etwa das Auto an der Wallbox: als Batteriesymbol oder als innerer Ring
 - Eigener Icon-Satz für Wärmepumpen und Heizung
+- Optional Wetter oben in der Ecke: aktuelle Temperatur mit farbigem, animiertem Wettersymbol
 - Vollständiger Konfigurationseditor im gleichen Stil wie Status-Übersicht und Trash Card Plus, YAML optional
 - Hintergrund, Transparenz, Glas-Effekt, Rahmen und Schatten frei einstellbar
 
@@ -181,7 +182,7 @@ und den Standard-Dialog für Aktionen.
 | Tab | Inhalt |
 |---|---|
 | Knoten | Liste aller Knoten (PV, Haus, Speicher, Netz, Verbraucher) mit Sortieren, Entfernen und eigener Bearbeiten-Seite samt Live-Vorschau |
-| Anzeige | Titel, Mitte, Knoten & Ring |
+| Anzeige | Titel, Wetter, Mitte, Knoten & Ring |
 | Animation | Punkte & Schweif, Tempo nach Leistung |
 | Werte | Zahlenformat, Darstellung bei 0 W |
 | Design | Hintergrund & Transparenz, Text, Rahmen, Form & Abstände |
@@ -228,6 +229,34 @@ die dem Standard entsprechen, landen nicht in der YAML.
 | `display_zero_lines.mode` | string | `show` | `show`, `grey`, `transparency`, `hide` |
 | `display_zero_lines.grey_color` | string | `#4e5867` | Farbe im Grau-Modus |
 | `display_zero_lines.transparency` | number | `50` | Prozent im Transparenz-Modus, wirkt auf die Linie inaktiver Knoten |
+
+### Wetter
+
+Mit einer Wetterentität erscheinen oben in der Ecke die aktuelle Temperatur und
+ein kleines Symbol für den Zustand (Sonne, Wolken, Regen, Schnee, Gewitter, Nebel,
+Wind …). Standardmäßig steht das Wetter in der Ecke **gegenüber dem Titel**: Titel
+links oder mittig → Wetter rechts, Titel rechts → Wetter links, ohne Titel rechts.
+Mit `weather_position` lässt sich die Seite fest vorgeben. Nachts (laut `sun.sun`)
+wird aus der Sonne ein Mond. Antippen öffnet standardmäßig die Wetterdetails.
+
+```yaml
+weather_entity: weather.forecast_home
+weather_temperature_entity: sensor.aussentemperatur   # optional, z. B. eigener Außenfühler
+weather_position: auto        # auto, left, right
+weather_show_condition: true  # „Teilweise bewölkt“ unter der Temperatur
+```
+
+| Option | Typ | Standard | Bedeutung |
+|---|---|---|---|
+| `weather_entity` | string | – | Wetterentität (`weather.*`), liefert Zustand und Temperatur |
+| `weather_temperature_entity` | string | – | Eigener Temperatursensor statt der Temperatur der Wetterentität |
+| `weather_position` | string | `auto` | `auto` (gegenüber dem Titel), `left`, `right` |
+| `weather_size` | number | `16` | Schriftgröße der Temperatur in px, das Symbol wächst mit |
+| `weather_decimals` | number | `0` | Nachkommastellen der Temperatur |
+| `weather_icon_style` | string | `color` | `color` (farbige Symbole) oder `mono` (MDI-Symbole in Textfarbe) |
+| `weather_animation` | bool | `true` | Farbige Symbole dezent animieren (Regen fällt, Sonne dreht sich …) |
+| `weather_show_condition` | bool | `false` | Zustand als Text unter der Temperatur |
+| `weather_tap_action` | action | `more-info` | Aktion beim Antippen des Wetters |
 
 ### Design
 

@@ -6,7 +6,7 @@
  * Kein Build-Schritt nötig — Datei als Modul-Ressource einbinden.
  */
 
-const VERSION = "5.0.0";
+const VERSION = "5.1.0";
 
 /* ==================================================================
    Defaults
@@ -17,6 +17,17 @@ const DEFAULTS = {
   title_size: 16,
   title_weight: 500,
   title_align: "left",
+
+  // Wetter oben in der Ecke gegenüber dem Titel
+  weather_entity: null,
+  weather_temperature_entity: null,
+  weather_position: "auto",
+  weather_size: 16,
+  weather_decimals: 0,
+  weather_icon_style: "color",
+  weather_animation: true,
+  weather_show_condition: false,
+  weather_tap_action: { action: "more-info" },
   center_image: null,
   center_icon: "mdi:flash",
   center_background: null,
@@ -176,6 +187,169 @@ function iconMarkup(icon, fallback) {
   }
   return `<ha-icon icon="${ic}"></ha-icon>`;
 }
+
+/* ==================================================================
+   Wetter – farbige Symbole je Zustand der HA-Wetterentität
+================================================================== */
+const WX_COL = {
+  sun: "#fbbf24", ray: "#f59e0b", moon: "#f3dc8e", moonEdge: "#d9bd62",
+  cloud: "#e2e8f0", cloudEdge: "#94a3b8", cloudBack: "#94a3b8",
+  dark: "#8491a5", darkEdge: "#5b6679", darkBack: "#5b6679",
+  rain: "#3b9eff", snow: "#6cbcf5", bolt: "#fbbf24", fog: "#a3aec0", wind: "#7fb6d9", alert: "#ef5350",
+};
+
+// Wolke im 32er-Raster, Unterkante bei y = 24
+const WX_CLOUD = "M9.2 24h14.2a5.3 5.3 0 0 0 .7-10.55A7.4 7.4 0 0 0 10.3 12.2a5.9 5.9 0 0 0-1.1 11.8z";
+const WX_MOON = "M14.6 5.8a10.2 10.2 0 1 0 11.6 11.6 7.9 7.9 0 0 1-11.6-11.6z";
+
+function wxSun(cx, cy, r) {
+  let rays = "";
+  for (let i = 0; i < 8; i++) {
+    const a = (i * Math.PI) / 4;
+    const x1 = cx + Math.cos(a) * (r + 2.2), y1 = cy + Math.sin(a) * (r + 2.2);
+    const x2 = cx + Math.cos(a) * (r + 4.6), y2 = cy + Math.sin(a) * (r + 4.6);
+    rays += `M${x1.toFixed(2)} ${y1.toFixed(2)}L${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  }
+  return `<g class="wx-sun"><path class="wx-rays" d="${rays}" stroke="${WX_COL.ray}" stroke-width="1.8"
+      stroke-linecap="round" style="transform-origin:${cx}px ${cy}px"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="${WX_COL.sun}"/></g>`;
+}
+
+function wxMoon(tf = "") {
+  return `<g class="wx-moon" ${tf ? `transform="${tf}"` : ""}><path d="${WX_MOON}" fill="${WX_COL.moon}"
+    stroke="${WX_COL.moonEdge}" stroke-width=".8" stroke-linejoin="round"/></g>`;
+}
+
+function wxCloud(tf, dark, back) {
+  const fill = back ? (dark ? WX_COL.darkBack : WX_COL.cloudBack) : (dark ? WX_COL.dark : WX_COL.cloud);
+  const edge = dark ? WX_COL.darkEdge : WX_COL.cloudEdge;
+  return `<g class="wx-cloud${back ? " back" : ""}"><path d="${WX_CLOUD}" transform="${tf}" fill="${fill}"
+    ${back ? "" : `stroke="${edge}" stroke-width=".9" stroke-linejoin="round"`}/></g>`;
+}
+
+// Wolke weiter oben, damit darunter Platz für Niederschlag bleibt
+const WX_TOP = "translate(1.2 -4.2) scale(.93)";
+
+function wxDrops(xs, len = 3.2, color = WX_COL.rain) {
+  return xs.map((x, i) => `<path class="wx-drop" style="animation-delay:${(i * 0.37) % 1.1}s"
+    d="M${x} 21.6l-1 ${len}" stroke="${color}" stroke-width="1.8" stroke-linecap="round"/>`).join("");
+}
+
+function wxFlakes(xs) {
+  return xs.map((x, i) => `<g class="wx-flake" style="animation-delay:${(i * 0.6) % 1.8}s">
+    <circle cx="${x}" cy="24" r="1.55" fill="${WX_COL.snow}"/></g>`).join("");
+}
+
+function wxHail(xs) {
+  return xs.map((x, i) => `<circle class="wx-drop" style="animation-delay:${(i * 0.4) % 1.2}s"
+    cx="${x}" cy="23.4" r="1.25" fill="none" stroke="${WX_COL.snow}" stroke-width="1.2"/>`).join("");
+}
+
+const WX_BOLT = `<path class="wx-bolt" d="M17.6 17.8l-3.6 5.6h3l-1.6 5.2 4.9-6.7h-3.1l1.9-4.1z" fill="${WX_COL.bolt}"
+  stroke="#d97706" stroke-width=".5" stroke-linejoin="round"/>`;
+
+const WX_WIND = `<g class="wx-wind" fill="none" stroke="${WX_COL.wind}" stroke-width="1.8" stroke-linecap="round">
+  <path d="M4 12.5h15.5a3.2 3.2 0 1 0-3.1-4"/><path d="M4 17h20.5a3.2 3.2 0 1 1-3.1 4"/><path d="M6.5 21.5h8"/></g>`;
+
+/** Farbiges Symbol für einen HA-Wetterzustand. night: Mond statt Sonne. */
+function weatherSvg(condition, night) {
+  const cl = (dark) => wxCloud(WX_TOP, dark);
+  let body;
+  switch (condition) {
+    case "sunny":
+      body = night ? wxMoon() : wxSun(16, 16, 6.2);
+      break;
+    case "clear-night":
+      body = wxMoon();
+      break;
+    case "partlycloudy":
+      body = (night ? wxMoon("translate(8.2 -1.8) scale(.62)") : wxSun(20.8, 11, 4.5)) +
+        wxCloud("translate(-1.6 3) scale(.9)");
+      break;
+    case "cloudy":
+      body = wxCloud("translate(8 -3.4) scale(.72)", false, true) + wxCloud("translate(-1.6 3) scale(.9)");
+      break;
+    case "fog":
+      body = wxCloud("translate(1.2 -5) scale(.93)") +
+        `<g class="wx-fog" stroke="${WX_COL.fog}" stroke-width="1.8" stroke-linecap="round">
+          <path d="M6 21.8h17"/><path d="M9 25.4h17"/><path d="M5 29h14"/></g>`;
+      break;
+    case "rainy":
+      body = cl(false) + wxDrops([11.5, 16.5, 21.5]);
+      break;
+    case "pouring":
+      body = cl(true) + wxDrops([9.5, 13.5, 17.5, 21.5, 25.5], 4.4);
+      break;
+    case "snowy":
+      body = cl(false) + wxFlakes([11, 16.5, 22]);
+      break;
+    case "snowy-rainy":
+      body = cl(false) + wxDrops([11.5, 21.5]) + wxFlakes([16.5]);
+      break;
+    case "hail":
+      body = cl(false) + wxHail([11, 16.5, 22]);
+      break;
+    case "lightning":
+      body = cl(true) + WX_BOLT;
+      break;
+    case "lightning-rainy":
+      body = cl(true) + wxDrops([10.5, 24]) + WX_BOLT;
+      break;
+    case "windy":
+      body = WX_WIND;
+      break;
+    case "windy-variant":
+      body = wxCloud("translate(3.5 -6) scale(.78)") +
+        `<g class="wx-wind" fill="none" stroke="${WX_COL.wind}" stroke-width="1.8" stroke-linecap="round">
+          <path d="M4 21h17.5a3 3 0 1 1-2.9 3.8"/><path d="M7 25.5h7"/></g>`;
+      break;
+    case "exceptional":
+      body = `<path d="M16 4.5 29 27H3z" fill="${WX_COL.alert}" stroke="${WX_COL.alert}" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M16 12.5v7" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="23.3" r="1.4" fill="#fff"/>`;
+      break;
+    default:
+      body = wxCloud("translate(-1.6 3) scale(.9)") ;
+  }
+  return `<svg class="wx-svg" viewBox="0 0 32 32" fill="none" aria-hidden="true">${body}</svg>`;
+}
+
+const WEATHER_MDI = {
+  "clear-night": "mdi:weather-night", cloudy: "mdi:weather-cloudy", exceptional: "mdi:alert-circle-outline",
+  fog: "mdi:weather-fog", hail: "mdi:weather-hail", lightning: "mdi:weather-lightning",
+  "lightning-rainy": "mdi:weather-lightning-rainy", partlycloudy: "mdi:weather-partly-cloudy",
+  pouring: "mdi:weather-pouring", rainy: "mdi:weather-rainy", snowy: "mdi:weather-snowy",
+  "snowy-rainy": "mdi:weather-snowy-rainy", sunny: "mdi:weather-sunny", windy: "mdi:weather-windy",
+  "windy-variant": "mdi:weather-windy-variant",
+};
+
+function weatherMdi(condition, night) {
+  if (night && condition === "partlycloudy") return "mdi:weather-night-partly-cloudy";
+  if (night && condition === "sunny") return "mdi:weather-night";
+  return WEATHER_MDI[condition] || "mdi:weather-cloudy-alert";
+}
+
+const WEATHER_LABELS = {
+  "clear-night": "Klar", cloudy: "Bewölkt", exceptional: "Außergewöhnlich", fog: "Nebel", hail: "Hagel",
+  lightning: "Gewitter", "lightning-rainy": "Gewitter, Regen", partlycloudy: "Teilweise bewölkt",
+  pouring: "Starkregen", rainy: "Regen", snowy: "Schnee", "snowy-rainy": "Schneeregen", sunny: "Sonnig",
+  windy: "Windig", "windy-variant": "Windig, bewölkt",
+};
+
+const WEATHER_CSS = `
+  .wx-rays { animation: wx-spin 24s linear infinite; }
+  .wx-cloud:not(.back) { animation: wx-bob 6s ease-in-out infinite; }
+  .wx-drop { animation: wx-fall 1.1s linear infinite; }
+  .wx-flake { animation: wx-snow 1.8s linear infinite; }
+  .wx-bolt { animation: wx-flash 3.2s ease-in-out infinite; }
+  .wx-fog path:nth-child(2) { animation: wx-drift 5s ease-in-out infinite; }
+  .wx-wind { animation: wx-drift 4s ease-in-out infinite; }
+  @keyframes wx-spin { to { transform: rotate(360deg); } }
+  @keyframes wx-bob { 0%,100% { transform: translateX(0); } 50% { transform: translateX(.8px); } }
+  @keyframes wx-fall { 0% { transform: translateY(-1.5px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(-1px, 4px); opacity: 0; } }
+  @keyframes wx-snow { 0% { transform: translateY(-2px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(.8px, 4.5px); opacity: 0; } }
+  @keyframes wx-flash { 0%,62%,74%,100% { opacity: 1; } 66%,70% { opacity: .25; } }
+  @keyframes wx-drift { 0%,100% { transform: translateX(0); } 50% { transform: translateX(1.5px); } }
+`;
 
 const NODE_LABELS = {
   solar: "PV",
@@ -677,7 +851,7 @@ class RadialFlowCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>${this._styles(nodeR, hubR, vb)}</style>
       <ha-card>
-        ${c.title ? `<div class="title">${String(c.title).replace(/[<>]/g, "")}</div>` : ""}
+        ${this._headerHtml()}
         <div class="wrap">
           <svg class="flow" id="flow" viewBox="0 0 ${vb} ${vb}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
             <g>${lines}</g>
@@ -744,10 +918,112 @@ class RadialFlowCard extends HTMLElement {
       double: { action: "none" },
     }));
 
+    const wx = this.shadowRoot.getElementById("wx");
+    this._wx = wx
+      ? { root: wx, icon: wx.querySelector(".wx-ico"), val: wx.querySelector(".wx-val"),
+          unit: wx.querySelector(".wx-unit"), cond: wx.querySelector(".wx-cond"), key: null, text: null }
+      : null;
+    if (wx) {
+      bindActions(wx, () => ({
+        host: this,
+        hass: this._hass,
+        entity: c.weather_entity || c.weather_temperature_entity,
+        tap: c.weather_tap_action,
+        hold: { action: "none" },
+        double: { action: "none" },
+      }));
+    }
+
     this._anim = { phase: "solar", gap: 0 };
     this._built = true;
     this._update();
     this._startLoop();
+  }
+
+  /** Seite der Wetteranzeige: automatisch gegenüber dem Titel, sonst wie eingestellt. */
+  _weatherSide() {
+    const c = this._config;
+    if (c.weather_position === "left" || c.weather_position === "right") return c.weather_position;
+    return c.title && c.title_align === "right" ? "left" : "right";
+  }
+
+  /** Kopfzeile: Titel und Wetter liegen gemeinsam über der Grafik. */
+  _headerHtml() {
+    const c = this._config;
+    const hasWx = !!(c.weather_entity || c.weather_temperature_entity);
+    if (!c.title && !hasWx) return "";
+    const title = c.title ? `<div class="title">${esc(c.title)}</div>` : "";
+    const wx = hasWx
+      ? `<div class="wx" id="wx" role="button" tabindex="0">
+          <div class="wx-ico"></div>
+          <div class="wx-txt">
+            <div class="wx-temp"><span class="wx-val">–</span><span class="wx-unit"></span></div>
+            ${c.weather_show_condition ? `<div class="wx-cond"></div>` : ""}
+          </div>
+        </div>`
+      : "";
+    const side = this._weatherSide();
+    const align = c.title ? c.title_align || "left" : null;
+    const left = (side === "left" ? wx : "") + (align === "left" ? title : "");
+    const right = (align === "right" ? title : "") + (side === "right" ? wx : "");
+    return `<div class="header">${align === "center" ? title : ""}${left}<div class="spacer"></div>${right}</div>`;
+  }
+
+  /** Aktualisiert Symbol, Temperatur und Zustand – nur wenn sich etwas geändert hat. */
+  _updateWeather() {
+    const w = this._wx;
+    if (!w) return;
+    const c = this._config;
+    const hass = this._hass;
+    const st = c.weather_entity ? hass.states[c.weather_entity] : null;
+    const bad = (s) => !s || s.state === "unavailable" || s.state === "unknown";
+
+    // Temperatur: eigener Sensor hat Vorrang vor dem Attribut der Wetterentität
+    let temp = null;
+    let unit = "";
+    const ts = c.weather_temperature_entity ? hass.states[c.weather_temperature_entity] : null;
+    if (c.weather_temperature_entity) {
+      if (!bad(ts) && Number.isFinite(Number(ts.state))) {
+        temp = Number(ts.state);
+        unit = ts.attributes.unit_of_measurement || "";
+      }
+    } else if (!bad(st) && Number.isFinite(Number(st.attributes.temperature))) {
+      temp = Number(st.attributes.temperature);
+      unit = st.attributes.temperature_unit || hass.config?.unit_system?.temperature || "°C";
+    }
+    const dec = clamp(Math.round(num(c.weather_decimals)), 0, 2);
+    const lang = hass.locale?.language || hass.language || "de";
+    let val = "–";
+    if (temp !== null) {
+      try {
+        val = temp.toLocaleString(lang, { minimumFractionDigits: dec, maximumFractionDigits: dec });
+      } catch (e) {
+        val = temp.toFixed(dec);
+      }
+    }
+    if (w.val.textContent !== val) w.val.textContent = val;
+    const u = temp === null ? "" : unit;
+    if (w.unit.textContent !== u) w.unit.textContent = u;
+
+    // Symbol nach Zustand; Sonne wird nachts zum Mond
+    const cond = bad(st) ? null : st.state;
+    const night = hass.states["sun.sun"]?.state === "below_horizon";
+    const key = `${cond}|${night}`;
+    if (w.key !== key) {
+      w.key = key;
+      if (!cond) w.icon.innerHTML = "";
+      else if (c.weather_icon_style === "mono") w.icon.innerHTML = `<ha-icon icon="${weatherMdi(cond, night)}"></ha-icon>`;
+      else w.icon.innerHTML = weatherSvg(cond, night);
+      w.icon.style.display = cond ? "" : "none";
+    }
+    if (w.cond) {
+      let txt = "";
+      if (cond) {
+        try { txt = hass.formatEntityState ? hass.formatEntityState(st) : ""; } catch (e) { txt = ""; }
+        if (!txt || txt === cond) txt = WEATHER_LABELS[cond] || cond;
+      }
+      if (w.cond.textContent !== txt) w.cond.textContent = txt;
+    }
   }
 
   _nodeHtml(n, ringR, nodeR, vb) {
@@ -785,18 +1061,21 @@ class RadialFlowCard extends HTMLElement {
     const d = cardDesign(c);
     const pad = clamp(num(c.padding ?? 8), 0, 32);
     const fs = clamp(num(c.font_scale ?? 100), 60, 160) / 100;
+    const wxSize = clamp(num(c.weather_size ?? 16), 10, 40);
     return `
       :host { display: block; }
       ha-card {
         overflow: hidden; padding: 0 ${pad}px ${pad + 4}px; position: relative; ${d.card}
         ${d.text ? `--rf-text: ${d.text}; --rf-text2: ${d.text2};` : ""}
       }
+      .header {
+        position: absolute; top: 12px; left: ${pad + 10}px; right: ${pad + 10}px;
+        z-index: 2; pointer-events: none;
+        display: flex; align-items: center; gap: 12px;
+      }
+      .header .spacer { flex: 1 1 auto; }
       .title {
-        position: absolute;
-        top: 12px;
-        ${c.title_align === "right" ? `right: ${pad + 10}px;` : c.title_align === "center" ? "left: 0; right: 0; text-align: center;" : `left: ${pad + 10}px;`}
-        z-index: 2;
-        pointer-events: none;
+        ${c.title_align === "center" ? "position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center;" : "min-width: 0;"}
         font-size: ${clamp(c.title_size ?? 16, 8, 48)}px;
         font-weight: ${clamp(Math.round((c.title_weight ?? 500) / 100) * 100, 100, 900)};
         line-height: 1.2;
@@ -872,7 +1151,28 @@ class RadialFlowCard extends HTMLElement {
       .name { display: ${c.show_names ? "block" : "none"}; }
       .name:empty, .extra:empty { display: none; }
 
-      @media (prefers-reduced-motion: reduce) { .dot { display: none; } }
+      .wx {
+        display: flex; align-items: center; gap: ${(wxSize * 0.3).toFixed(1)}px;
+        pointer-events: auto; cursor: pointer; outline: none; flex: none;
+        border-radius: 10px; padding: 2px 4px; margin: -2px -4px;
+        ${this._weatherSide() === "right" ? "flex-direction: row-reverse; text-align: right;" : ""}
+      }
+      .wx:focus-visible { box-shadow: 0 0 0 2px var(--primary-color); }
+      .wx-ico { display: flex; align-items: center; justify-content: center;
+                width: ${(wxSize * 1.9).toFixed(1)}px; height: ${(wxSize * 1.9).toFixed(1)}px; flex: none;
+                color: var(--rf-text, var(--primary-text-color)); --mdc-icon-size: ${(wxSize * 1.6).toFixed(1)}px; }
+      .wx-svg { width: 100%; height: 100%; overflow: visible; }
+      .wx-txt { line-height: 1.1; white-space: nowrap; }
+      .wx-temp { font-size: ${wxSize}px; font-weight: 600; letter-spacing: -.01em;
+                 color: var(--rf-text, var(--primary-text-color)); }
+      .wx-unit { font-size: .72em; font-weight: 400; margin-left: 2px; color: var(--rf-text2, var(--secondary-text-color)); }
+      .wx-cond { font-size: ${Math.max(9, wxSize * 0.7).toFixed(1)}px; color: var(--rf-text2, var(--secondary-text-color)); margin-top: 1px; }
+      ${c.weather_animation === false ? "" : WEATHER_CSS}
+
+      @media (prefers-reduced-motion: reduce) {
+        .dot { display: none; }
+        .wx-svg * { animation: none !important; }
+      }
     `;
   }
 
@@ -1003,6 +1303,7 @@ class RadialFlowCard extends HTMLElement {
       r.dur = Math.max(0.25, this._flowDuration(s.v));
     });
 
+    this._updateWeather();
     this._startLoop();
   }
 
@@ -1194,13 +1495,13 @@ const T = {
   tabs: { nodes: "Knoten", display: "Anzeige", motion: "Animation", values: "Werte", design: "Design" },
   intro: {
     nodes: "Welche Sensoren liefern die Leistung? PV, Haus, Speicher und Netz sind fest, Verbraucher kannst du beliebig ergänzen und sortieren. Zum Bearbeiten einfach antippen.",
-    display: "Grundlayout der Grafik: Titel, Mitte sowie Größe von Knoten und Ring.",
+    display: "Grundlayout der Grafik: Titel, Wetter, Mitte sowie Größe von Knoten und Ring.",
     motion: "Wie schnell und wie auffällig die Punkte fließen. Das Tempo wirkt auf alle Linien, die Abstufung nach Leistung bleibt erhalten.",
     values: "Zahlenformat für alle Knoten, sofern dort nichts Eigenes eingetragen ist, und wie Linien bei 0 W aussehen.",
     design: "Hintergrund, Transparenz und Rahmen der Karte – genau wie bei der Status-Übersicht und der Abfall-Karte einstellbar.",
   },
   groups: {
-    title: "Titel", center: "Mitte", ring: "Knoten & Ring",
+    title: "Titel", weather: "Wetter", center: "Mitte", ring: "Knoten & Ring",
     dots: "Punkte & Schweif", timing: "Tempo nach Leistung",
     number: "Zahlenformat", zero: "Darstellung bei 0 W",
     bg: "Hintergrund & Transparenz", text: "Text", frame: "Rahmen, Form & Abstände",
@@ -1210,6 +1511,10 @@ const T = {
   fields: {
     title: "Titel (optional)", title_color: "Titelfarbe", title_size: "Schriftgröße Titel",
     title_weight: "Schriftstärke Titel", title_align: "Ausrichtung Titel",
+    weather_entity: "Wetterentität", weather_temperature_entity: "Eigener Temperatursensor (optional)",
+    weather_position: "Position", weather_size: "Größe", weather_icon_style: "Symbolstil",
+    weather_decimals: "Nachkommastellen", weather_show_condition: "Zustand als Text anzeigen",
+    weather_animation: "Symbol animieren", weather_tap_action: "Aktion beim Antippen",
     center_icon: "Symbol in der Mitte", center_size: "Größe der Mitte",
     center_image: "Bild statt Symbol (URL)", center_image_fit: "Bild einpassen",
     center_background: "Füllfarbe der Mitte",
@@ -1240,6 +1545,10 @@ const T = {
   },
   helpers: {
     title: "Liegt über der Grafik und verschiebt sie nicht.",
+    weather_entity: "Zeigt oben in der Ecke die aktuelle Temperatur und ein Symbol für das Wetter.",
+    weather_temperature_entity: "Leer = Temperatur der Wetterentität. Sonst z. B. dein Außenfühler.",
+    weather_position: "„Automatisch“ setzt das Wetter in die Ecke gegenüber dem Titel.",
+    weather_size: "Schriftgröße der Temperatur, das Symbol wächst mit.",
     center_background: "Füllt den Kreis vollständig, dann entfällt der Rahmen.",
     center_image: "Bild nach /config/www legen und /local/dateiname.svg eintragen.",
     ring_radius: "Knoten- und Ringgröße wirken direkt. Nur wenn sich Knoten sonst berühren würden, wird die Grafik insgesamt etwas kleiner.",
@@ -1265,6 +1574,8 @@ const T = {
   opt: {
     title_weight: { 300: "Leicht", 400: "Normal", 500: "Mittel", 600: "Halbfett", 700: "Fett", 800: "Sehr fett" },
     title_align: { left: "Links", center: "Mittig", right: "Rechts" },
+    weather_position: { auto: "Automatisch", left: "Oben links", right: "Oben rechts" },
+    weather_icon_style: { color: "Farbig", mono: "Einfarbig (Theme)" },
     center_image_fit: { contain: "Mit Rand einpassen", cover: "Füllt den Kreis" },
     display_zero_mode: { show: "Unverändert", grey: "Ausgrauen", transparency: "Transparent", hide: "Ausblenden" },
     ring_source: { soc: "Ladestand", power: "Leistung" },
@@ -1446,6 +1757,23 @@ class RadialFlowCardEditor extends HTMLElement {
           { name: "title_color", selector: { color_rgb: {} } },
         ),
       ], true),
+      this._group("weather", "mdi:weather-partly-cloudy", [
+        { name: "weather_entity", selector: { entity: { filter: [{ domain: "weather" }] } } },
+        ...((this._config.weather_entity || this._config.weather_temperature_entity) ? [
+          { name: "weather_temperature_entity", selector: { entity: { filter: [{ domain: "sensor", device_class: "temperature" }] } } },
+          this._grid(
+            { name: "weather_position", selector: this._opts("weather_position", ["auto", "left", "right"]) },
+            { name: "weather_size", selector: this._num(10, 40, 1, "px", "box") },
+          ),
+          this._grid(
+            { name: "weather_icon_style", selector: this._opts("weather_icon_style", ["color", "mono"]) },
+            { name: "weather_decimals", selector: this._num(0, 2, 1, "", "box") },
+          ),
+          { name: "weather_show_condition", selector: { boolean: {} } },
+          ...(this._val("weather_icon_style") !== "mono" ? [{ name: "weather_animation", selector: { boolean: {} } }] : []),
+          { name: "weather_tap_action", selector: { ui_action: {} } },
+        ] : []),
+      ], !!(this._config.weather_entity || this._config.weather_temperature_entity)),
       this._group("center", "mdi:circle-double", [
         this._grid(
           { name: "center_icon", selector: { icon: {} } },
@@ -2029,6 +2357,9 @@ class RadialFlowCardEditor extends HTMLElement {
     if (cfg.border_mode !== "custom") delete cfg.border_color;
     if (!["accent", "custom"].includes(cfg.border_mode)) delete cfg.border_width;
     if (!cfg.center_image) delete cfg.center_image_fit;
+    if (!cfg.weather_entity && !cfg.weather_temperature_entity) {
+      Object.keys(cfg).forEach((k) => { if (k.startsWith("weather_")) delete cfg[k]; });
+    }
     this._commit(cfg);
   }
 

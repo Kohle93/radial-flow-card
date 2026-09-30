@@ -1,5 +1,18 @@
 # Änderungen
 
+## 5.1.0
+- Neu: Wetteranzeige oben in der Ecke. Mit `weather_entity` erscheinen die
+  aktuelle Temperatur und ein kleines Symbol für den Zustand (sonnig, klar,
+  teilweise bewölkt, bewölkt, Nebel, Regen, Starkregen, Schnee, Schneeregen,
+  Hagel, Gewitter, Wind, Warnung). Die Symbole sind farbig und dezent animiert,
+  alternativ einfarbig als MDI-Symbol (`weather_icon_style: mono`). Nachts wird
+  aus der Sonne ein Mond
+- Die Seite ergibt sich automatisch aus dem Titel (gegenüber), lässt sich mit
+  `weather_position: left | right` aber auch fest vorgeben
+- Optional eigener Temperatursensor (`weather_temperature_entity`), Zustand als
+  Text, Größe, Nachkommastellen und Tap-Aktion (Standard: Wetterdetails)
+- Im Editor unter Anzeige → Wetter einstellbar
+
 ## 5.0.0
 - Editor komplett neu aufgebaut, einheitlich mit der Status-Übersicht-Karte und
   der Trash Card Plus: Tab-Leiste (Knoten, Anzeige, Animation, Werte, Design),
