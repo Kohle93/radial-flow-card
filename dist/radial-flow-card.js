@@ -6,7 +6,7 @@
  * Kein Build-Schritt nötig — Datei als Modul-Ressource einbinden.
  */
 
-const VERSION = "5.1.0";
+const VERSION = "5.2.0";
 
 /* ==================================================================
    Defaults
@@ -61,7 +61,8 @@ const DEFAULTS = {
   card_width: 100,
 
   // Design (gleiches System wie Status-Übersicht-Karte und Trash Card Plus)
-  bg_mode: "theme",
+  bg_mode: "theme",          // theme | tinted | accent | custom | none (wie EV Charge Card)
+  accent_color: null,
   bg_color: null,
   bg_opacity: 100,
   bg_gradient: false,
@@ -433,22 +434,51 @@ function contrastText(rgb) {
   return lum > 0.45 ? "#1c1c1c" : "#ffffff";
 }
 
+/* Schlüssel der EV Charge Card (card_bg_mode, card_bg_opacity …) werden
+   ebenfalls verstanden, damit sich Design-YAML zwischen den Karten kopieren lässt. */
+const DESIGN_ALIASES = {
+  card_bg_mode: "bg_mode", card_bg_color: "bg_color", card_bg_opacity: "bg_opacity",
+  card_bg_gradient: "bg_gradient", card_blur: "blur", card_border_mode: "border_mode",
+  card_border_color: "border_color", card_border_width: "border_width", card_shadow: "shadow",
+  card_radius: "radius",
+};
+
+function migrateAliases(config) {
+  const out = { ...(config || {}) };
+  Object.entries(DESIGN_ALIASES).forEach(([from, to]) => {
+    if (out[from] === undefined) return;
+    if (out[to] === undefined) out[to] = out[from];
+    delete out[from];
+  });
+  return out;
+}
+
 /** Liefert die CSS-Deklarationen für ha-card sowie die Textfarben. */
 function cardDesign(c) {
   const css = [];
   let text = null;
 
+  // Hintergrund nach Modus – gleiches Verhalten wie bei der EV Charge Card:
+  // theme | tinted (Theme + Farbton) | accent | custom | none
   const mode = c.bg_mode || "theme";
   const op = clamp(num(c.bg_opacity ?? 100), 0, 100);
+  const accent = toColor(c.accent_color, "var(--primary-color)");
   if (mode === "none") {
     css.push("background: transparent");
-  } else if (mode === "custom") {
-    const col = toColor(c.bg_color, THEME_BG);
+  } else if (mode === "tinted") {
+    // Deckkraft = Stärke des Farbtons über dem normalen Karten-Hintergrund
+    const tint = c.bg_gradient
+      ? `linear-gradient(135deg, ${withAlpha(accent, op)} 0%, ${withAlpha(accent, Math.round(op * 0.15))} 100%)`
+      : `linear-gradient(${withAlpha(accent, op)}, ${withAlpha(accent, op)})`;
+    css.push(`background: ${tint}, ${THEME_BG}`);
+  } else if (mode === "custom" || mode === "accent") {
+    const col = mode === "custom" ? toColor(c.bg_color, THEME_BG) : accent;
     const bg = c.bg_gradient
       ? `linear-gradient(135deg, ${withAlpha(col, op)} 0%, ${withAlpha(`color-mix(in srgb, ${col} 62%, black)`, op)} 100%)`
       : withAlpha(col, op);
     css.push(`background: ${bg}`);
-    const rgb = rgbOf(c.bg_color);
+    // Theme-Akzent ohne bekannten Farbwert gilt als kräftig → helle Schrift
+    const rgb = rgbOf(mode === "custom" ? c.bg_color : c.accent_color) || (mode === "accent" ? [0, 0, 0] : null);
     if ((c.text_color_mode || "auto") === "auto" && rgb && op >= 55) text = contrastText(rgb);
   } else if (op < 100) {
     css.push(`background: ${withAlpha(THEME_BG, op)}`);
@@ -460,7 +490,7 @@ function cardDesign(c) {
   // "theme" lässt den normalen Rahmen des Themes unangetastet
   const bw = clamp(num(c.border_width ?? 1), 0, 6);
   if (c.border_mode === "none") css.push("border: none");
-  else if (c.border_mode === "accent") css.push(`border: ${bw}px solid var(--primary-color)`);
+  else if (c.border_mode === "accent") css.push(`border: ${bw}px solid ${accent}`);
   else if (c.border_mode === "custom") css.push(`border: ${bw}px solid ${toColor(c.border_color, "var(--primary-color)")}`);
 
   if (c.shadow && c.shadow !== "theme") css.push(`box-shadow: ${SHADOWS[c.shadow] || "none"}`);
@@ -655,6 +685,7 @@ class RadialFlowCard extends HTMLElement {
   /* ---------- Konfiguration ---------- */
   setConfig(config) {
     if (!config) throw new Error("Keine Konfiguration übergeben");
+    config = migrateAliases(config);
     const c = { ...DEFAULTS, ...config };
     c.display_zero_lines = { ...DEFAULTS.display_zero_lines, ...(config.display_zero_lines || {}) };
     this._config = c;
@@ -1498,13 +1529,13 @@ const T = {
     display: "Grundlayout der Grafik: Titel, Wetter, Mitte sowie Größe von Knoten und Ring.",
     motion: "Wie schnell und wie auffällig die Punkte fließen. Das Tempo wirkt auf alle Linien, die Abstufung nach Leistung bleibt erhalten.",
     values: "Zahlenformat für alle Knoten, sofern dort nichts Eigenes eingetragen ist, und wie Linien bei 0 W aussehen.",
-    design: "Hintergrund, Transparenz und Rahmen der Karte – genau wie bei der Status-Übersicht und der Abfall-Karte einstellbar.",
+    design: "Hintergrund, Deckkraft und Rahmen der Karte – genau wie bei der EV Charge Card, der Status-Übersicht und der Abfall-Karte einstellbar.",
   },
   groups: {
     title: "Titel", weather: "Wetter", center: "Mitte", ring: "Knoten & Ring",
     dots: "Punkte & Schweif", timing: "Tempo nach Leistung",
     number: "Zahlenformat", zero: "Darstellung bei 0 W",
-    bg: "Hintergrund & Transparenz", text: "Text", frame: "Rahmen, Form & Abstände",
+    bg: "Karte – Hintergrund & Transparenz", text: "Text", frame: "Karte – Rahmen, Form & Abstände",
     sensor: "Sensor", look: "Name, Symbol & Farbe", node_values: "Werte & Ring", soc: "Ladestand",
     behaviour: "Verhalten", extra: "Zusatzinfo", actions: "Aktionen",
   },
@@ -1529,8 +1560,8 @@ const T = {
     kilo_threshold: "Ab dieser Leistung in kW anzeigen", base_decimals: "Nachkommastellen W",
     kilo_decimals: "Nachkommastellen kW", display_zero_tolerance: "Toleranz für „aus“",
     display_zero_mode: "Linie bei 0 W", grey_color: "Graufarbe", transparency: "Transparenz",
-    bg_mode: "Hintergrund", bg_color: "Hintergrundfarbe", bg_opacity: "Deckkraft", bg_gradient: "Farbverlauf",
-    blur: "Unschärfe dahinter (Glas-Effekt)",
+    bg_mode: "Hintergrund der Karte", bg_color: "Farbe der Karte", bg_opacity: "Deckkraft der Karte", bg_gradient: "Farbverlauf",
+    accent_color: "Akzentfarbe", blur: "Unschärfe hinter der Karte (Glas-Effekt)",
     text_color_mode: "Textfarbe der Werte", text_color: "Eigene Textfarbe", font_scale: "Schriftgröße der Werte",
     border_mode: "Rahmen", border_color: "Rahmenfarbe", border_width: "Rahmenstärke",
     shadow: "Schatten", radius: "Eckenradius", padding: "Innenabstand",
@@ -1555,7 +1586,8 @@ const T = {
     tail_segments: "0 schaltet den Schweif ab.",
     min_expected_power: "Unterhalb läuft die Animation am langsamsten, oberhalb der oberen Grenze am schnellsten.",
     display_zero_tolerance: "Unterhalb dieses Werts gilt ein Knoten als aus.",
-    bg_opacity: "0 % = durchsichtig, 100 % = deckend.",
+    bg_opacity: "0 % = durchsichtig, 100 % = deckend. Bei „Theme + Farbton“ ist das die Stärke des Farbtons.",
+    accent_color: "Farbe für „Theme + Farbton“, „Volle Akzentfarbe“ und den Akzent-Rahmen. Leer = Akzentfarbe des Themes.",
     blur: "Der Hintergrund hinter der Karte wird unscharf durchscheinend – wie Milchglas.",
     text_color_mode: "„Automatisch“ wählt auf kräftigen eigenen Hintergründen eine gut lesbare Farbe.",
     font_scale: "Skaliert Werte, Einheiten und Namen an den Knoten.",
@@ -1580,9 +1612,9 @@ const T = {
     display_zero_mode: { show: "Unverändert", grey: "Ausgrauen", transparency: "Transparent", hide: "Ausblenden" },
     ring_source: { soc: "Ladestand", power: "Leistung" },
     soc_display: { battery: "Batteriesymbol mit Prozent", ring: "Innerer Ring (voll = 100 %)", none: "Nicht anzeigen" },
-    bg_mode: { theme: "Karten-Hintergrund (Theme)", custom: "Eigene Farbe", none: "Transparent (kein Hintergrund)" },
+    bg_mode: { theme: "Karten-Hintergrund (Theme)", tinted: "Theme + Farbton", accent: "Volle Akzentfarbe", custom: "Eigene Farbe", none: "Transparent (kein Hintergrund)" },
     text_color_mode: { auto: "Automatisch (guter Kontrast)", theme: "Theme-Textfarbe", custom: "Eigene Farbe" },
-    border_mode: { none: "Kein Rahmen", accent: "Akzentfarbe (Theme)", theme: "Dezent (Theme)", custom: "Eigene Farbe" },
+    border_mode: { none: "Kein Rahmen", accent: "Akzentfarbe", theme: "Dezent (Theme)", custom: "Eigene Farbe" },
     shadow: { theme: "Wie Theme", none: "Kein Schatten", soft: "Weich", strong: "Kräftig" },
   },
   node_types: { solar: "PV", grid: "Netz", battery: "Speicher", home: "Haus", individual: "Verbraucher" },
@@ -1624,7 +1656,7 @@ const EDITOR_STATE = { tab: "nodes" };
 
 // Anzeigewert im Formular, solange nichts eingestellt ist (Karte folgt dann dem Theme)
 const UI_FALLBACK = { radius: 12 };
-const COLOR_KEYS = ["title_color", "center_background", "bg_color", "text_color", "border_color"];
+const COLOR_KEYS = ["title_color", "center_background", "bg_color", "accent_color", "text_color", "border_color"];
 const FIXED_NODES = ["solar", "home", "battery", "grid"];
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
@@ -1691,7 +1723,7 @@ class RadialFlowCardEditor extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = { ...(config || {}) };
+    this._config = migrateAliases(config);
     if (!Array.isArray(this._config.individual)) this._config.individual = [];
     if (this._edit && this._edit.type === "individual" && !this._config.individual[this._edit.index]) this._edit = null;
     this._refresh();
@@ -1844,11 +1876,13 @@ class RadialFlowCardEditor extends HTMLElement {
   _schemaDesign() {
     const v = (k) => this._val(k);
     return [
-      this._group("bg", "mdi:format-color-fill", [
-        { name: "bg_mode", selector: this._opts("bg_mode", ["theme", "custom", "none"]) },
+      this._group("bg", "mdi:card-outline", [
+        { name: "bg_mode", selector: this._opts("bg_mode", ["theme", "tinted", "accent", "custom", "none"]) },
         ...(v("bg_mode") === "custom" ? [{ name: "bg_color", selector: { color_rgb: {} } }] : []),
+        ...(["tinted", "accent"].includes(v("bg_mode")) || v("border_mode") === "accent"
+          ? [{ name: "accent_color", selector: { color_rgb: {} } }] : []),
         ...(v("bg_mode") !== "none" ? [{ name: "bg_opacity", selector: this._num(0, 100, 1, "%") }] : []),
-        ...(v("bg_mode") === "custom" ? [{ name: "bg_gradient", selector: { boolean: {} } }] : []),
+        ...(["tinted", "accent", "custom"].includes(v("bg_mode")) ? [{ name: "bg_gradient", selector: { boolean: {} } }] : []),
         { name: "blur", selector: this._num(0, 30, 1, "px") },
       ], true),
       this._group("text", "mdi:format-text", [
@@ -2351,7 +2385,9 @@ class RadialFlowCardEditor extends HTMLElement {
     else delete cfg.display_zero_lines;
 
     // Abhängige Werte entfernen, wenn der zugehörige Modus sie nicht nutzt
-    if (cfg.bg_mode !== "custom") { delete cfg.bg_color; delete cfg.bg_gradient; }
+    if (cfg.bg_mode !== "custom") delete cfg.bg_color;
+    if (!["tinted", "accent", "custom"].includes(cfg.bg_mode)) delete cfg.bg_gradient;
+    if (!["tinted", "accent"].includes(cfg.bg_mode) && cfg.border_mode !== "accent") delete cfg.accent_color;
     if (cfg.bg_mode === "none") delete cfg.bg_opacity;
     if (cfg.text_color_mode !== "custom") delete cfg.text_color;
     if (cfg.border_mode !== "custom") delete cfg.border_color;

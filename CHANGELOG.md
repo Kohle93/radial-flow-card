@@ -1,5 +1,16 @@
 # Änderungen
 
+## 5.2.0
+- Design-Tab an die EV Charge Card angeglichen: Gruppe „Karte – Hintergrund &
+  Transparenz“ mit „Hintergrund der Karte“, „Deckkraft der Karte“, Farbverlauf
+  und Glas-Effekt
+- Neue Hintergründe „Theme + Farbton“ (`tinted`, Deckkraft = Stärke des
+  Farbtons) und „Volle Akzentfarbe“ (`accent`), dazu `accent_color`; der
+  Farbverlauf ist jetzt auch für diese beiden Modi verfügbar
+- Der Akzent-Rahmen nutzt ebenfalls `accent_color`
+- Die Design-Schlüssel der EV Charge Card (`card_bg_mode`, `card_bg_opacity` …)
+  werden verstanden und beim Bearbeiten in die eigenen Schlüssel übernommen
+
 ## 5.1.0
 - Neu: Wetteranzeige oben in der Ecke. Mit `weather_entity` erscheinen die
   aktuelle Temperatur und ein kleines Symbol für den Zustand (sonnig, klar,

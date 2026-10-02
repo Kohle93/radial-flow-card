@@ -260,14 +260,20 @@ weather_show_condition: true  # „Teilweise bewölkt“ unter der Temperatur
 
 ### Design
 
-Dasselbe System wie bei der Status-Übersicht-Karte und der Trash Card Plus.
+Dasselbe System wie bei der EV Charge Card, der Status-Übersicht-Karte und der
+Trash Card Plus. Die Deckkraft der Karte steht im Editor unter
+*Design → Karte – Hintergrund & Transparenz → Deckkraft der Karte*. Die Schlüssel
+der EV Charge Card (`card_bg_mode`, `card_bg_opacity`, `card_bg_color`,
+`card_bg_gradient`, `card_blur`, `card_border_*`, `card_shadow`, `card_radius`)
+werden ebenfalls verstanden, Design-YAML lässt sich also zwischen den Karten kopieren.
 
 | Option | Typ | Standard | Bedeutung |
 |---|---|---|---|
-| `bg_mode` | string | `theme` | `theme` (Karten-Hintergrund), `custom` (eigene Farbe), `none` (transparent) |
+| `bg_mode` | string | `theme` | `theme` (Karten-Hintergrund), `tinted` (Theme + Farbton), `accent` (volle Akzentfarbe), `custom` (eigene Farbe), `none` (transparent) |
 | `bg_color` | string \| [r,g,b] | – | Farbe bei `bg_mode: custom` |
-| `bg_opacity` | number | `100` | Deckkraft des Hintergrunds in % |
-| `bg_gradient` | bool | `false` | Farbverlauf bei eigener Farbe |
+| `accent_color` | string \| [r,g,b] | Theme-Akzent | Farbe für `tinted`, `accent` und den Akzent-Rahmen |
+| `bg_opacity` | number | `100` | Deckkraft der Karte in %; bei `tinted` die Stärke des Farbtons |
+| `bg_gradient` | bool | `false` | Farbverlauf bei `tinted`, `accent` und `custom` |
 | `blur` | number | `0` | Unschärfe hinter der Karte in px (Glas-Effekt) |
 | `text_color_mode` | string | `auto` | `auto` (Kontrast zu kräftigem Hintergrund), `theme`, `custom` |
 | `text_color` | string \| [r,g,b] | – | Farbe bei `text_color_mode: custom` |
