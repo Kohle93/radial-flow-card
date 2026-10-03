@@ -260,38 +260,39 @@ weather_show_condition: true  # „Teilweise bewölkt“ unter der Temperatur
 
 ### Design
 
-Dasselbe System wie bei der EV Charge Card, der Status-Übersicht-Karte und der
-Trash Card Plus. Die Deckkraft der Karte steht im Editor unter
-*Design → Karte – Hintergrund & Transparenz → Deckkraft der Karte*. Die Schlüssel
-der EV Charge Card (`card_bg_mode`, `card_bg_opacity`, `card_bg_color`,
-`card_bg_gradient`, `card_blur`, `card_border_*`, `card_shadow`, `card_radius`)
-werden ebenfalls verstanden, Design-YAML lässt sich also zwischen den Karten kopieren.
+Einheitlicher Design-Standard für alle Karten (Trash Card Plus, EV Charge Card,
+Status-Übersicht-Karte und diese Karte): dieselben Auswahlen, dieselben Namen und
+dieselben Schlüssel. Im Editor unter *Design*: Akzentfarbe, *Karte – Hintergrund &
+Transparenz*, *Karte – Rahmen, Form & Abstände* und *Text*. Design-YAML lässt sich
+damit 1:1 zwischen den Karten kopieren. Die alten Schlüssel bis v5.2 (`bg_mode`,
+`bg_opacity`, `blur`, `border_mode`, `shadow`, `radius` …) werden weiterhin
+verstanden und beim Bearbeiten automatisch umbenannt.
 
 | Option | Typ | Standard | Bedeutung |
 |---|---|---|---|
-| `bg_mode` | string | `theme` | `theme` (Karten-Hintergrund), `tinted` (Theme + Farbton), `accent` (volle Akzentfarbe), `custom` (eigene Farbe), `none` (transparent) |
-| `bg_color` | string \| [r,g,b] | – | Farbe bei `bg_mode: custom` |
 | `accent_color` | string \| [r,g,b] | Theme-Akzent | Farbe für `tinted`, `accent` und den Akzent-Rahmen |
-| `bg_opacity` | number | `100` | Deckkraft der Karte in %; bei `tinted` die Stärke des Farbtons |
-| `bg_gradient` | bool | `false` | Farbverlauf bei `tinted`, `accent` und `custom` |
-| `blur` | number | `0` | Unschärfe hinter der Karte in px (Glas-Effekt) |
+| `card_bg_mode` | string | `theme` | `theme` (Theme-Hintergrund), `tinted` (Theme + Farbton), `accent` (volle Akzentfarbe), `custom` (eigene Farbe), `none` (transparent) |
+| `card_bg_color` | string \| [r,g,b] | – | Farbe bei `card_bg_mode: custom` |
+| `card_bg_opacity` | number | `100` | Deckkraft der Karte in %; bei `tinted` die Stärke des Farbtons |
+| `card_bg_gradient` | bool | `false` | Farbverlauf bei `tinted`, `accent` und `custom` |
+| `card_blur` | number | `0` | Unschärfe hinter der Karte in px (Glas-Effekt) |
+| `card_border_mode` | string | `theme` | `theme` (wie Theme), `none`, `accent`, `custom` |
+| `card_border_color` | string \| [r,g,b] | – | Farbe bei `card_border_mode: custom` |
+| `card_border_width` | number | `1` | Rahmenstärke in px bei `accent`/`custom` |
+| `card_shadow` | string | `theme` | `theme`, `none`, `soft`, `strong` |
+| `card_radius` | number | Theme | Eckenradius in px |
+| `padding` | number | `8` | Innenabstand der Karte in px |
 | `text_color_mode` | string | `auto` | `auto` (Kontrast zu kräftigem Hintergrund), `theme`, `custom` |
 | `text_color` | string \| [r,g,b] | – | Farbe bei `text_color_mode: custom` |
 | `font_scale` | number | `100` | Schriftgröße der Werte, Einheiten und Namen in % |
-| `border_mode` | string | `theme` | `none`, `accent`, `theme` (normaler Rahmen des Themes), `custom` |
-| `border_color` | string \| [r,g,b] | – | Farbe bei `border_mode: custom` |
-| `border_width` | number | `1` | Rahmenstärke in px bei `accent`/`custom` |
-| `shadow` | string | `theme` | `theme`, `none`, `soft`, `strong` |
-| `radius` | number | Theme | Eckenradius in px |
-| `padding` | number | `8` | Innenabstand in px |
 
 ```yaml
 # Glas-Optik
-bg_mode: theme
-bg_opacity: 40
-blur: 12
-border_mode: none
-radius: 24
+card_bg_mode: theme
+card_bg_opacity: 40
+card_blur: 12
+card_border_mode: none
+card_radius: 24
 ```
 
 ### Knoten

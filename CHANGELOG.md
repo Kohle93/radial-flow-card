@@ -1,5 +1,17 @@
 # Änderungen
 
+## 5.3.0
+- Einheitlicher Design-Standard mit Trash Card Plus, EV Charge Card und
+  Status-Übersicht-Karte: gleiche Auswahlen, gleiche Bezeichnungen, gleiche
+  Reihenfolge im Design-Tab (Akzentfarbe → Karte – Hintergrund & Transparenz →
+  Karte – Rahmen, Form & Abstände → Text)
+- Design-Schlüssel heißen jetzt wie in den anderen Karten: `card_bg_mode`,
+  `card_bg_color`, `card_bg_opacity`, `card_bg_gradient`, `card_blur`,
+  `card_border_mode`, `card_border_color`, `card_border_width`, `card_shadow`,
+  `card_radius`. Die bisherigen Schlüssel (`bg_mode`, `blur`, `radius` …) werden
+  weiter verstanden und beim Bearbeiten automatisch umbenannt
+- Akzentfarbe steht immer oben im Design-Tab; Innenabstand bis 40 px
+
 ## 5.2.0
 - Design-Tab an die EV Charge Card angeglichen: Gruppe „Karte – Hintergrund &
   Transparenz“ mit „Hintergrund der Karte“, „Deckkraft der Karte“, Farbverlauf
