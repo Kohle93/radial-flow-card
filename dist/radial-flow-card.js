@@ -6,7 +6,7 @@
  * Kein Build-Schritt nötig — Datei als Modul-Ressource einbinden.
  */
 
-const VERSION = "5.3.0";
+const VERSION = "5.3.1";
 
 /* ==================================================================
    Defaults
@@ -455,10 +455,17 @@ function migrateAliases(config) {
   return out;
 }
 
-/** Liefert die CSS-Deklarationen für ha-card sowie die Textfarben. */
+/** Liefert Hintergrund (bg/bf), die übrigen CSS-Deklarationen für ha-card
+    sowie die Textfarben. Der Hintergrund wird – genau wie bei Trash Card Plus,
+    EV Charge Card und Status-Übersicht – auf einer eigenen Ebene (ha-card::before)
+    gemalt, ha-card selbst bleibt transparent. Vorher lag er direkt auf ha-card;
+    dadurch kam beim Modus „Theme“ der Kartenhintergrund des Themes (inkl.
+    card-mod/Glas-Themes) durch, während die anderen Karten die Theme-Variable
+    malen – die Power-Flow-Karte sah deshalb dunkler aus als die anderen. */
 function cardDesign(c) {
   const css = [];
   let text = null;
+  let bg = THEME_BG;
 
   // Hintergrund nach Modus – gleiches Verhalten wie bei der EV Charge Card:
   // theme | tinted (Theme + Farbton) | accent | custom | none
@@ -466,28 +473,27 @@ function cardDesign(c) {
   const op = clamp(num(c.card_bg_opacity ?? 100), 0, 100);
   const accent = toColor(c.accent_color, "var(--primary-color)");
   if (mode === "none") {
-    css.push("background: transparent");
+    bg = "transparent";
   } else if (mode === "tinted") {
     // Deckkraft = Stärke des Farbtons über dem normalen Karten-Hintergrund
     const tint = c.card_bg_gradient
       ? `linear-gradient(135deg, ${withAlpha(accent, op)} 0%, ${withAlpha(accent, Math.round(op * 0.15))} 100%)`
       : `linear-gradient(${withAlpha(accent, op)}, ${withAlpha(accent, op)})`;
-    css.push(`background: ${tint}, ${THEME_BG}`);
+    bg = `${tint}, ${THEME_BG}`;
   } else if (mode === "custom" || mode === "accent") {
     const col = mode === "custom" ? toColor(c.card_bg_color, THEME_BG) : accent;
-    const bg = c.card_bg_gradient
+    bg = c.card_bg_gradient
       ? `linear-gradient(135deg, ${withAlpha(col, op)} 0%, ${withAlpha(`color-mix(in srgb, ${col} 62%, black)`, op)} 100%)`
       : withAlpha(col, op);
-    css.push(`background: ${bg}`);
     // Theme-Akzent ohne bekannten Farbwert gilt als kräftig → helle Schrift
     const rgb = rgbOf(mode === "custom" ? c.card_bg_color : c.accent_color) || (mode === "accent" ? [0, 0, 0] : null);
     if ((c.text_color_mode || "auto") === "auto" && rgb && op >= 55) text = contrastText(rgb);
-  } else if (op < 100) {
-    css.push(`background: ${withAlpha(THEME_BG, op)}`);
+  } else {
+    bg = withAlpha(THEME_BG, op);
   }
 
   const blur = clamp(num(c.card_blur), 0, 30);
-  if (blur > 0) css.push(`backdrop-filter: blur(${blur}px)`, `-webkit-backdrop-filter: blur(${blur}px)`);
+  const bf = blur > 0 ? `blur(${blur}px)` : "none";
 
   // "theme" lässt den normalen Rahmen des Themes unangetastet
   const bw = clamp(num(c.card_border_width ?? 1), 0, 6);
@@ -501,6 +507,8 @@ function cardDesign(c) {
   if (c.text_color_mode === "custom" && c.text_color) text = toColor(c.text_color);
   return {
     card: css.map((d) => `${d};`).join(" "),
+    bg,
+    bf,
     text,
     text2: text ? `color-mix(in srgb, ${text} 70%, transparent)` : null,
   };
@@ -1098,8 +1106,15 @@ class RadialFlowCard extends HTMLElement {
     return `
       :host { display: block; }
       ha-card {
-        overflow: hidden; padding: 0 ${pad}px ${pad + 4}px; position: relative; ${d.card}
+        overflow: hidden; padding: 0 ${pad}px ${pad + 4}px; position: relative; isolation: isolate;
+        background: transparent; ${d.card}
         ${d.text ? `--rf-text: ${d.text}; --rf-text2: ${d.text2};` : ""}
+      }
+      /* Hintergrund + Glas-Effekt auf eigener Ebene – identisch zu den anderen Karten */
+      ha-card::before {
+        content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+        background: ${d.bg};
+        backdrop-filter: ${d.bf}; -webkit-backdrop-filter: ${d.bf};
       }
       .header {
         position: absolute; top: 12px; left: ${pad + 10}px; right: ${pad + 10}px;

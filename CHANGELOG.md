@@ -1,5 +1,13 @@
 # Änderungen
 
+## 5.3.1
+- Behoben: Die Karte wirkte dunkler als Trash Card Plus, EV Charge Card und
+  Status-Übersicht, obwohl alles gleich eingestellt war. Der Hintergrund lag
+  direkt auf `ha-card`, sodass beim Modus „Theme“ der Kartenstil des Themes
+  durchkam (z. B. Glas-/card-mod-Themes), während die anderen Karten die
+  Theme-Farbe auf einer eigenen Ebene malen. Jetzt wird der Hintergrund samt
+  Glas-Effekt genau wie bei den anderen Karten auf `ha-card::before` gemalt
+
 ## 5.3.0
 - Einheitlicher Design-Standard mit Trash Card Plus, EV Charge Card und
   Status-Übersicht-Karte: gleiche Auswahlen, gleiche Bezeichnungen, gleiche
