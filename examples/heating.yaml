@@ -1,29 +1,29 @@
-# Heizungsansicht mit dem eigenen Icon-Satz.
-# Der Heizstab läuft nicht und bleibt trotzdem sichtbar.
+# Heating view with the card's own icon set.
+# The heating element is not running and still stays visible.
 type: custom:radial-flow-card
-title: Heizung
+title: Heating
 
 solar:
-  entity: sensor.pv_leistung
+  entity: sensor.pv_power
   max_power: 10000
 grid:
-  entity: sensor.netz_leistung
+  entity: sensor.grid_power
 home:
-  entity: sensor.hausverbrauch
+  entity: sensor.home_consumption
 
 individual:
-  - entity: sensor.waermepumpe_leistung
-    name: Wärmepumpe
+  - entity: sensor.heat_pump_power
+    name: Heat pump
     icon: rf:heatpump
     color: "#e8833a"
-    secondary_entity: sensor.vorlauftemperatur
-    note: Heizkreis 1
-  - entity: sensor.heizstab_leistung
-    name: Heizstab
+    secondary_entity: sensor.flow_temperature
+    note: Heating circuit 1
+  - entity: sensor.heating_element_power
+    name: Heating element
     icon: rf:heat-waves
     color: "#c76a4e"
-  - entity: sensor.fussbodenheizung_leistung
-    name: Fußboden
+  - entity: sensor.floor_heating_power
+    name: Floor heating
     icon: rf:floor-heating
     color: "#7f9f3a"
     subtract_from_home: false

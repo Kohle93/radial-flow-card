@@ -1,6 +1,6 @@
-# Viele Verbraucher. Die Knoten verteilen sich automatisch auf dem Ring.
+# Many consumers. The nodes are distributed on the ring automatically.
 type: custom:radial-flow-card
-title: Hausübersicht
+title: House overview
 node_size: 0.9
 ring_radius: 270
 show_names: true
@@ -10,31 +10,31 @@ center_background: "#c62828"
 center_image_fit: cover
 
 solar:
-  entity: sensor.pv_leistung
+  entity: sensor.pv_power
   max_power: 10000
 grid:
-  entity: sensor.netz_leistung
+  entity: sensor.grid_power
 battery:
-  entity: sensor.speicher_leistung
+  entity: sensor.battery_power
   invert: true
-  state_of_charge: sensor.speicher_soc
+  state_of_charge: sensor.battery_soc
 home:
-  entity: sensor.hausverbrauch
+  entity: sensor.home_consumption
 
 individual:
-  - entity: sensor.wallbox_leistung
+  - entity: sensor.wallbox_power
     name: Wallbox
     icon: mdi:ev-station
-  - entity: sensor.waermepumpe_leistung
-    name: Wärmepumpe
+  - entity: sensor.heat_pump_power
+    name: Heat pump
     icon: rf:heatpump-waves
-  - entity: sensor.waschkueche_leistung
-    name: Waschküche
+  - entity: sensor.laundry_power
+    name: Laundry
     icon: mdi:washing-machine
-  - entity: sensor.pool_leistung
+  - entity: sensor.pool_power
     name: Pool
     icon: mdi:pool
-  - entity: sensor.buero_leistung
-    name: Büro
+  - entity: sensor.office_power
+    name: Office
     icon: mdi:desktop-tower-monitor
     subtract_from_home: false

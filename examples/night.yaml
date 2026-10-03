@@ -1,21 +1,21 @@
-# Nachtbetrieb: keine Erzeugung, der Speicher versorgt Haus und Wärmepumpe.
-# PV und Netz stehen auf 0 W, behalten aber Farbe und Position.
+# Night mode: no generation, the battery supplies the house and the heat pump.
+# PV and grid are at 0 W but keep their color and position.
 type: custom:radial-flow-card
-title: Nachts
+title: Night
 
 solar:
-  entity: sensor.pv_leistung
+  entity: sensor.pv_power
   max_power: 10000
 grid:
-  entity: sensor.netz_leistung
+  entity: sensor.grid_power
 battery:
-  entity: sensor.speicher_leistung
-  state_of_charge: sensor.speicher_soc
+  entity: sensor.battery_power
+  state_of_charge: sensor.battery_soc
   ring_source: soc
 
 individual:
-  - entity: sensor.waermepumpe_leistung
-    name: Wärmepumpe
+  - entity: sensor.heat_pump_power
+    name: Heat pump
     icon: rf:heatpump
     color: "#e8833a"
 

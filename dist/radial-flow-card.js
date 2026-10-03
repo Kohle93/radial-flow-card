@@ -6,7 +6,7 @@
  * Kein Build-Schritt nötig — Datei als Modul-Ressource einbinden.
  */
 
-const VERSION = "5.3.1";
+const VERSION = "5.4.0";
 
 /* ==================================================================
    Defaults
@@ -330,13 +330,6 @@ function weatherMdi(condition, night) {
   return WEATHER_MDI[condition] || "mdi:weather-cloudy-alert";
 }
 
-const WEATHER_LABELS = {
-  "clear-night": "Klar", cloudy: "Bewölkt", exceptional: "Außergewöhnlich", fog: "Nebel", hail: "Hagel",
-  lightning: "Gewitter", "lightning-rainy": "Gewitter, Regen", partlycloudy: "Teilweise bewölkt",
-  pouring: "Starkregen", rainy: "Regen", snowy: "Schnee", "snowy-rainy": "Schneeregen", sunny: "Sonnig",
-  windy: "Windig", "windy-variant": "Windig, bewölkt",
-};
-
 const WEATHER_CSS = `
   .wx-rays { animation: wx-spin 24s linear infinite; }
   .wx-cloud:not(.back) { animation: wx-bob 6s ease-in-out infinite; }
@@ -352,13 +345,6 @@ const WEATHER_CSS = `
   @keyframes wx-flash { 0%,62%,74%,100% { opacity: 1; } 66%,70% { opacity: .25; } }
   @keyframes wx-drift { 0%,100% { transform: translateX(0); } 50% { transform: translateX(1.5px); } }
 `;
-
-const NODE_LABELS = {
-  solar: "PV",
-  home: "Haus",
-  battery: "Speicher",
-  grid: "Netz",
-};
 
 /* SVG-Koordinatensystem: 1000x1000 ist die komfortable Grundgröße.
    Übersteigt Ring + Knoten + Beschriftung diesen Rahmen, wächst die
@@ -694,7 +680,7 @@ class RadialFlowCard extends HTMLElement {
 
   /* ---------- Konfiguration ---------- */
   setConfig(config) {
-    if (!config) throw new Error("Keine Konfiguration übergeben");
+    if (!config) throw new Error(T.card.no_config);
     config = migrateAliases(config);
     const c = { ...DEFAULTS, ...config };
     c.display_zero_lines = { ...DEFAULTS.display_zero_lines, ...(config.display_zero_lines || {}) };
@@ -756,6 +742,12 @@ class RadialFlowCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    setLang(hass);
+    // Sprache gewechselt → komplett neu aufbauen, damit alle Texte neu entstehen
+    if (this._built && this._lang !== T_LANG) {
+      this._built = false;
+      if (this.shadowRoot) this.shadowRoot.innerHTML = "";
+    }
     if (!this._built) this._render();
     else this._update();
   }
@@ -976,6 +968,7 @@ class RadialFlowCard extends HTMLElement {
     }
 
     this._anim = { phase: "solar", gap: 0 };
+    this._lang = T_LANG;
     this._built = true;
     this._update();
     this._startLoop();
@@ -1061,7 +1054,7 @@ class RadialFlowCard extends HTMLElement {
       let txt = "";
       if (cond) {
         try { txt = hass.formatEntityState ? hass.formatEntityState(st) : ""; } catch (e) { txt = ""; }
-        if (!txt || txt === cond) txt = WEATHER_LABELS[cond] || cond;
+        if (!txt || txt === cond) txt = T.card.weather[cond] || cond;
       }
       if (w.cond.textContent !== txt) w.cond.textContent = txt;
     }
@@ -1281,7 +1274,7 @@ class RadialFlowCard extends HTMLElement {
       if (r.value.textContent !== val) r.value.textContent = val;
       if (r.unit.textContent !== unit) r.unit.textContent = unit;
 
-      const name = n.name || NODE_LABELS[n.type] || this._friendlyName(n) || "";
+      const name = n.name || T.card.nodes[n.type] || this._friendlyName(n) || "";
       if (r.name.textContent !== name) r.name.textContent = name;
 
       const extra = this._extraLine(n);
@@ -1539,7 +1532,7 @@ class RadialFlowCard extends HTMLElement {
    Plus: Tab-Leiste oben, Einleitung je Tab, aufklappbare Gruppen mit
    Symbol, Knotenliste mit eigener Bearbeiten-Seite und Vorschau.
 ================================================================== */
-const T = {
+const T_DE = {
   tabs: { nodes: "Knoten", display: "Anzeige", motion: "Animation", values: "Werte", design: "Design" },
   intro: {
     nodes: "Welche Sensoren liefern die Leistung? PV, Haus, Speicher und Netz sind fest, Verbraucher kannst du beliebig ergänzen und sortieren. Zum Bearbeiten einfach antippen.",
@@ -1641,20 +1634,171 @@ const T = {
   edit_node: "bearbeiten", not_set: "Nicht eingerichtet – antippen zum Einrichten",
   no_entity: "Kein Sensor gewählt", balance: "Kein Sensor – Bilanz aus PV, Netz und Speicher",
   tag_soc: "Ladestand", tag_off: "aus", no_consumers: "Noch keine Verbraucher angelegt.",
+  no_form: "Die Formularkomponenten von Home Assistant konnten nicht geladen werden. Bitte in YAML konfigurieren.",
+  // Feldnamen, die je Knotentyp abweichen (Netz/Speicher)
+  node_labels: {
+    grid: {
+      entity: "Sensor kombiniert (+ = Bezug)",
+      entity_a: "Sensor Bezug",
+      entity_b: "Sensor Einspeisung",
+    },
+    battery: {
+      entity: "Sensor kombiniert (+ = Entladen)",
+      entity_a: "Sensor Entladeleistung",
+      entity_b: "Sensor Ladeleistung",
+    },
+  },
+  // Texte in der Karte selbst
+  card: {
+    nodes: { solar: "PV", home: "Haus", battery: "Speicher", grid: "Netz" },
+    weather: {
+      "clear-night": "Klar", cloudy: "Bewölkt", exceptional: "Außergewöhnlich", fog: "Nebel", hail: "Hagel",
+      lightning: "Gewitter", "lightning-rainy": "Gewitter, Regen", partlycloudy: "Teilweise bewölkt",
+      pouring: "Starkregen", rainy: "Regen", snowy: "Schnee", "snowy-rainy": "Schneeregen", sunny: "Sonnig",
+      windy: "Windig", "windy-variant": "Windig, bewölkt",
+    },
+    no_config: "Keine Konfiguration übergeben",
+  },
 };
 
-const NODE_LABEL_OVERRIDES = {
-  grid: {
-    entity: "Sensor kombiniert (+ = Bezug)",
-    entity_a: "Sensor Bezug",
-    entity_b: "Sensor Einspeisung",
+const T_EN = {
+  tabs: { nodes: "Nodes", display: "Display", motion: "Animation", values: "Values", design: "Design" },
+  intro: {
+    nodes: "Which sensors provide the power? Solar, home, battery and grid are fixed; you can add and sort as many consumers as you like. Tap a node to edit it.",
+    display: "Basic layout of the graphic: title, weather, center and the size of nodes and ring.",
+    motion: "How fast and how prominently the dots flow. The speed applies to all lines; the scaling by power is kept.",
+    values: "Number format for all nodes that have no setting of their own, and how lines look at 0 W.",
+    design: "Background, opacity and border of the card – set up exactly like in Trash Card Plus, the EV Charge Card and the Status Summary Card.",
   },
-  battery: {
-    entity: "Sensor kombiniert (+ = Entladen)",
-    entity_a: "Sensor Entladeleistung",
-    entity_b: "Sensor Ladeleistung",
+  groups: {
+    title: "Title", weather: "Weather", center: "Center", ring: "Nodes & ring",
+    dots: "Dots & tail", timing: "Speed by power",
+    number: "Number format", zero: "Display at 0 W",
+    card_bg: "Card – background & transparency", text: "Text", card_frame: "Card – border, shape & spacing",
+    sensor: "Sensor", look: "Name, icon & color", node_values: "Values & ring", soc: "State of charge",
+    behaviour: "Behavior", extra: "Additional info", actions: "Actions",
+  },
+  fields: {
+    title: "Title (optional)", title_color: "Title color", title_size: "Title font size",
+    title_weight: "Title font weight", title_align: "Title alignment",
+    weather_entity: "Weather entity", weather_temperature_entity: "Custom temperature sensor (optional)",
+    weather_position: "Position", weather_size: "Size", weather_icon_style: "Icon style",
+    weather_decimals: "Decimal places", weather_show_condition: "Show condition as text",
+    weather_animation: "Animate icon", weather_tap_action: "Tap action",
+    center_icon: "Center icon", center_size: "Center size",
+    center_image: "Image instead of icon (URL)", center_image_fit: "Image fit",
+    center_background: "Center fill color",
+    center_tap_action: "Center tap action", center_hold_action: "Center hold action",
+    card_width: "Graphic width", node_size: "Node size", ring_radius: "Ring size",
+    track_opacity: "Ring background opacity", ring_transition: "Ring transition",
+    show_names: "Show names below the values",
+    speed: "Overall speed", dot_size: "Dot size", cycle_gap: "Pause between cycles",
+    tail_length: "Tail length", tail_segments: "Tail resolution",
+    min_flow_rate: "Fastest cycle", max_flow_rate: "Slowest cycle",
+    min_expected_power: "Lower power limit", max_expected_power: "Upper power limit",
+    kilo_threshold: "Show in kW from this power", base_decimals: "Decimal places W",
+    kilo_decimals: "Decimal places kW", display_zero_tolerance: "Tolerance for “off”",
+    display_zero_mode: "Line at 0 W", grey_color: "Grey color", transparency: "Transparency",
+    accent_color: "Accent color",
+    card_bg_mode: "Card background", card_bg_color: "Card color", card_bg_opacity: "Card opacity",
+    card_bg_gradient: "Gradient", card_blur: "Blur behind card (glass effect)",
+    card_border_mode: "Card border", card_border_color: "Card border color", card_border_width: "Card border width",
+    card_shadow: "Card shadow", card_radius: "Card corner radius", padding: "Card padding",
+    text_color_mode: "Text color", text_color: "Custom text color", font_scale: "Value font size",
+    entity: "Sensor (power)", entity_a: "Sensor A", entity_b: "Sensor B", invert: "Invert sign",
+    name: "Name", icon: "Icon", color: "Color", unit: "Unit (empty = automatic)", decimals: "Decimal places",
+    max_power: "Maximum power for the ring", ring_source: "Ring shows",
+    state_of_charge: "State of charge sensor (%)", soc_display: "State of charge display", soc_color: "State of charge color",
+    charging_entity: "“Charging” sensor (optional)", charging_state: "States meaning “charging” (empty = automatic)",
+    subtract_from_home: "Subtract from home consumption", subtract_individual: "Subtract consumers from home consumption",
+    secondary_entity: "Additional sensor (third line)", secondary_unit: "Additional sensor unit", note: "Additional text (fixed)",
+    tap_action: "Tap action", hold_action: "Hold action", double_tap_action: "Double tap action",
+  },
+  helpers: {
+    title: "Sits above the graphic and does not move it.",
+    weather_entity: "Shows the current temperature and a weather icon in the top corner.",
+    weather_temperature_entity: "Empty = temperature of the weather entity. Otherwise e.g. your outdoor sensor.",
+    weather_position: "“Automatic” places the weather in the corner opposite the title.",
+    weather_size: "Font size of the temperature; the icon scales with it.",
+    center_background: "Fills the circle completely; the border is then omitted.",
+    center_image: "Put the image into /config/www and enter /local/filename.svg.",
+    ring_radius: "Node and ring size apply directly. Only if nodes would otherwise touch is the whole graphic shown slightly smaller.",
+    tail_segments: "0 turns the tail off.",
+    min_expected_power: "Below this the animation runs slowest, above the upper limit fastest.",
+    display_zero_tolerance: "Below this value a node counts as off.",
+    card_bg_opacity: "0 % = see-through, 100 % = opaque. For “Theme + tint” this is the strength of the tint.",
+    accent_color: "Color for “Theme + tint”, “Full accent color” and the accent border of the card. Empty = theme accent color.",
+    card_blur: "The background behind the card is blurred – like frosted glass.",
+    text_color_mode: "“Automatic” picks an easily readable color on strong custom backgrounds.",
+    font_scale: "Scales values, units and names at the nodes.",
+    entity_a: "Alternative to the combined sensor: two separate sensors.",
+    max_power: "Empty = ring always full. Otherwise the ring shows the share of this power.",
+    charging_state: "Separate multiple states with commas. Detected automatically: on, charging, numbers > 0 …",
+    subtract_from_home: "Prevents the power from being counted twice in the home consumption.",
+    subtract_individual: "Master switch for all consumers.",
+    note: "Appears as a fixed line below the value.",
+  },
+  node_helpers: {
+    home: { entity: "Empty = home consumption is calculated as the balance of solar, grid and battery." },
+    default: { entity: "Without a sensor the node shows 0 W." },
+  },
+  opt: {
+    title_weight: { 300: "Light", 400: "Normal", 500: "Medium", 600: "Semi-bold", 700: "Bold", 800: "Extra bold" },
+    title_align: { left: "Left", center: "Center", right: "Right" },
+    weather_position: { auto: "Automatic", left: "Top left", right: "Top right" },
+    weather_icon_style: { color: "Colored", mono: "Single color (theme)" },
+    center_image_fit: { contain: "Fit with margin", cover: "Fill the circle" },
+    display_zero_mode: { show: "Unchanged", grey: "Grey out", transparency: "Transparent", hide: "Hide" },
+    ring_source: { soc: "State of charge", power: "Power" },
+    soc_display: { battery: "Battery icon with percentage", ring: "Inner ring (full = 100 %)", none: "Hidden" },
+    card_bg_mode: { theme: "Theme background", tinted: "Theme + tint", accent: "Full accent color", custom: "Custom color", none: "Transparent (no background)" },
+    text_color_mode: { auto: "Automatic (good contrast)", theme: "Theme text color", custom: "Custom color" },
+    card_border_mode: { theme: "Like theme", none: "No border", accent: "Accent color", custom: "Custom color" },
+    shadow: { theme: "Like theme", none: "No shadow", soft: "Soft", strong: "Strong" },
+  },
+  node_types: { solar: "Solar", grid: "Grid", battery: "Battery", home: "Home", individual: "Consumer" },
+  sections: { sources: "Sources & home", consumers: "Consumers" },
+  preview: "Preview · current value", back: "Back", edit: "Edit", delete: "Remove",
+  move_up: "Move forward", move_down: "Move back", add_consumer: "Add consumer",
+  edit_node: "settings", not_set: "Not set up – tap to set up",
+  no_entity: "No sensor selected", balance: "No sensor – balance of solar, grid and battery",
+  tag_soc: "SoC", tag_off: "off", no_consumers: "No consumers added yet.",
+  no_form: "The Home Assistant form components could not be loaded. Please configure the card in YAML.",
+  node_labels: {
+    grid: {
+      entity: "Combined sensor (+ = import)",
+      entity_a: "Grid import sensor",
+      entity_b: "Grid export sensor",
+    },
+    battery: {
+      entity: "Combined sensor (+ = discharging)",
+      entity_a: "Discharge power sensor",
+      entity_b: "Charge power sensor",
+    },
+  },
+  card: {
+    nodes: { solar: "Solar", home: "Home", battery: "Battery", grid: "Grid" },
+    weather: {
+      "clear-night": "Clear, night", cloudy: "Cloudy", exceptional: "Exceptional", fog: "Fog", hail: "Hail",
+      lightning: "Lightning", "lightning-rainy": "Lightning, rainy", partlycloudy: "Partly cloudy",
+      pouring: "Pouring", rainy: "Rainy", snowy: "Snowy", "snowy-rainy": "Snowy, rainy", sunny: "Sunny",
+      windy: "Windy", "windy-variant": "Windy, cloudy",
+    },
+    no_config: "No configuration provided",
   },
 };
+
+const langOf = (hass) => String(hass?.locale?.language || hass?.language || 'de').toLowerCase();
+const isDe = (hass) => langOf(hass).startsWith('de');
+// Fehlende EN-Schlüssel fallen auf DE zurück (Sicherheitsnetz, soll aber nie greifen)
+const mergeStrings = (base, over) => { const o = Array.isArray(base) ? [...base] : { ...base };
+  Object.entries(over || {}).forEach(([k, v]) => { o[k] = v && typeof v === 'object' && !Array.isArray(v) && typeof v !== 'function' && base[k] && typeof base[k] === 'object' ? mergeStrings(base[k], v) : v; });
+  return o; };
+const T_EN_FULL = mergeStrings(T_DE, T_EN);
+let T = T_DE;
+let T_LANG = 'de';
+// Liefert true, wenn sich die Sprache geändert hat
+const setLang = (hass) => { const l = isDe(hass) ? 'de' : 'en'; if (l === T_LANG) return false; T_LANG = l; T = l === 'de' ? T_DE : T_EN_FULL; return true; };
 
 const POWER_ENTITY = {
   entity: { filter: [{ domain: ["sensor", "input_number", "counter", "number"] }] },
@@ -1749,6 +1893,14 @@ class RadialFlowCardEditor extends HTMLElement {
   set hass(hass) {
     const first = !this._hass;
     this._hass = hass;
+    setLang(hass);
+    // Sprache gewechselt → Tabs, Pane und Formulare neu aufbauen
+    if (this._built && this._lang !== T_LANG) {
+      this._built = false;
+      this._paneKey = null;
+      this._refresh();
+      return;
+    }
     if (first) this._refresh();
     else this._pushHass();
   }
@@ -2098,7 +2250,7 @@ class RadialFlowCardEditor extends HTMLElement {
         this._loading = false;
         if (!customElements.get("ha-form")) {
           this.shadowRoot.innerHTML =
-            '<p style="padding:16px">Die Formularkomponenten von Home Assistant konnten nicht geladen werden. Bitte in YAML konfigurieren.</p>';
+            `<p style="padding:16px">${esc(this._t("no_form"))}</p>`;
           return;
         }
       }
@@ -2112,6 +2264,7 @@ class RadialFlowCardEditor extends HTMLElement {
 
   _build() {
     this._built = true;
+    this._lang = T_LANG;
     this.shadowRoot.innerHTML = `<style>${EDITOR_CSS}</style><div class="tabs"></div><div class="pane"></div>`;
     this._tabsEl = this.shadowRoot.querySelector(".tabs");
     this._paneEl = this.shadowRoot.querySelector(".pane");
@@ -2175,7 +2328,7 @@ class RadialFlowCardEditor extends HTMLElement {
     pane.appendChild(this._pv);
 
     const helpers = T.node_helpers[type] || T.node_helpers.default;
-    this._nodeForm = this._makeForm((value) => this._nodeChanged(value), NODE_LABEL_OVERRIDES[type], helpers);
+    this._nodeForm = this._makeForm((value) => this._nodeChanged(value), T.node_labels[type], helpers);
     pane.appendChild(this._nodeForm);
   }
 
@@ -2434,7 +2587,7 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "radial-flow-card",
   name: "Radial Flow Card",
-  description: "Radiale Energieflusskarte mit Nabe, animierten Flüssen und Editor",
+  description: "Radial energy flow card with a hub, animated flows and a visual editor",
   preview: false,
 });
 

@@ -1,12 +1,12 @@
 # Radial Flow Card
 
-Energieflusskarte mit radialem Aufbau: eine Nabe in der Mitte, alle Knoten auf einem
-Ring darum, animierte Punkte auf den Speichen.
+Energy flow card with a radial layout: a hub in the center, all nodes on a
+ring around it, animated dots on the spokes.
 
-- Beliebig viele Verbraucher, Reihenfolge im Editor aenderbar
-- Teilringe zeigen den Anteil an einer definierten Maximalleistung
-- Tap, Hold und Doppeltipp je Knoten
-- Vollstaendiger Konfigurationseditor, kein YAML noetig
-- Kein Build-Schritt, eine einzelne Datei
+- Any number of consumers, order can be changed in the editor
+- Partial rings show the share of a defined maximum power
+- Tap, hold and double tap per node
+- Complete configuration editor, no YAML required
+- No build step, a single file
 
-Nach der Installation die Ressource pruefen und das Dashboard neu laden.
+After installing, check the resource and reload the dashboard.

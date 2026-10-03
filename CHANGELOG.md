@@ -1,153 +1,159 @@
-# Änderungen
+# Changelog
+
+## 5.4.0
+- Editor and card texts are now bilingual: German when Home Assistant runs in
+  German, English otherwise (weather conditions, default node names, all
+  editor labels). The language follows Home Assistant at runtime; names you
+  set yourself are never translated
 
 ## 5.3.1
-- Behoben: Die Karte wirkte dunkler als Trash Card Plus, EV Charge Card und
-  Status-Übersicht, obwohl alles gleich eingestellt war. Der Hintergrund lag
-  direkt auf `ha-card`, sodass beim Modus „Theme“ der Kartenstil des Themes
-  durchkam (z. B. Glas-/card-mod-Themes), während die anderen Karten die
-  Theme-Farbe auf einer eigenen Ebene malen. Jetzt wird der Hintergrund samt
-  Glas-Effekt genau wie bei den anderen Karten auf `ha-card::before` gemalt
+- Fixed: the card looked darker than Trash Card Plus, EV Charge Card and
+  Status Summary Card even though everything was set the same. The background
+  was painted directly on `ha-card`, so in "Theme" mode the theme's own card
+  style showed through (e.g. glass or card-mod themes), while the other cards
+  paint the theme color on a separate layer. The background, including the
+  glass effect, is now painted on `ha-card::before` exactly like in the other cards
 
 ## 5.3.0
-- Einheitlicher Design-Standard mit Trash Card Plus, EV Charge Card und
-  Status-Übersicht-Karte: gleiche Auswahlen, gleiche Bezeichnungen, gleiche
-  Reihenfolge im Design-Tab (Akzentfarbe → Karte – Hintergrund & Transparenz →
-  Karte – Rahmen, Form & Abstände → Text)
-- Design-Schlüssel heißen jetzt wie in den anderen Karten: `card_bg_mode`,
+- Shared design standard with Trash Card Plus, EV Charge Card and
+  Status Summary Card: same options, same names, same order in the Design
+  tab (accent color → card – background & transparency → card – border,
+  shape & spacing → text)
+- Design keys now have the same names as in the other cards: `card_bg_mode`,
   `card_bg_color`, `card_bg_opacity`, `card_bg_gradient`, `card_blur`,
   `card_border_mode`, `card_border_color`, `card_border_width`, `card_shadow`,
-  `card_radius`. Die bisherigen Schlüssel (`bg_mode`, `blur`, `radius` …) werden
-  weiter verstanden und beim Bearbeiten automatisch umbenannt
-- Akzentfarbe steht immer oben im Design-Tab; Innenabstand bis 40 px
+  `card_radius`. The previous keys (`bg_mode`, `blur`, `radius` …) are still
+  understood and renamed automatically when editing
+- The accent color is always at the top of the Design tab; padding up to 40 px
 
 ## 5.2.0
-- Design-Tab an die EV Charge Card angeglichen: Gruppe „Karte – Hintergrund &
-  Transparenz“ mit „Hintergrund der Karte“, „Deckkraft der Karte“, Farbverlauf
-  und Glas-Effekt
-- Neue Hintergründe „Theme + Farbton“ (`tinted`, Deckkraft = Stärke des
-  Farbtons) und „Volle Akzentfarbe“ (`accent`), dazu `accent_color`; der
-  Farbverlauf ist jetzt auch für diese beiden Modi verfügbar
-- Der Akzent-Rahmen nutzt ebenfalls `accent_color`
-- Die Design-Schlüssel der EV Charge Card (`card_bg_mode`, `card_bg_opacity` …)
-  werden verstanden und beim Bearbeiten in die eigenen Schlüssel übernommen
+- Design tab aligned with the EV Charge Card: group "Card – background &
+  transparency" with "Card background", "Card opacity", gradient
+  and glass effect
+- New backgrounds "Theme + tint" (`tinted`, opacity = strength of the
+  tint) and "Full accent color" (`accent`), plus `accent_color`; the
+  gradient is now also available for these two modes
+- The accent border also uses `accent_color`
+- The design keys of the EV Charge Card (`card_bg_mode`, `card_bg_opacity` …)
+  are understood and converted to the card's own keys when editing
 
 ## 5.1.0
-- Neu: Wetteranzeige oben in der Ecke. Mit `weather_entity` erscheinen die
-  aktuelle Temperatur und ein kleines Symbol für den Zustand (sonnig, klar,
-  teilweise bewölkt, bewölkt, Nebel, Regen, Starkregen, Schnee, Schneeregen,
-  Hagel, Gewitter, Wind, Warnung). Die Symbole sind farbig und dezent animiert,
-  alternativ einfarbig als MDI-Symbol (`weather_icon_style: mono`). Nachts wird
-  aus der Sonne ein Mond
-- Die Seite ergibt sich automatisch aus dem Titel (gegenüber), lässt sich mit
-  `weather_position: left | right` aber auch fest vorgeben
-- Optional eigener Temperatursensor (`weather_temperature_entity`), Zustand als
-  Text, Größe, Nachkommastellen und Tap-Aktion (Standard: Wetterdetails)
-- Im Editor unter Anzeige → Wetter einstellbar
+- New: weather display in the top corner. With `weather_entity` the
+  current temperature and a small icon for the condition appear (sunny, clear,
+  partly cloudy, cloudy, fog, rain, heavy rain, snow, sleet,
+  hail, thunderstorm, wind, warning). The icons are colored and subtly animated,
+  or monochrome as an MDI icon (`weather_icon_style: mono`). At night the
+  sun turns into a moon
+- The side is derived automatically from the title (opposite), but can also be
+  fixed with `weather_position: left | right`
+- Optional own temperature sensor (`weather_temperature_entity`), condition as
+  text, size, decimals and tap action (default: weather details)
+- Configurable in the editor under Display → Weather
 
 ## 5.0.0
-- Editor komplett neu aufgebaut, einheitlich mit der Status-Übersicht-Karte und
-  der Trash Card Plus: Tab-Leiste (Knoten, Anzeige, Animation, Werte, Design),
-  Einleitung je Tab und aufklappbare Gruppen mit Symbol
-- Knoten-Tab als Liste mit Symbol in Knotenfarbe, Sensor, Sortieren und
-  Entfernen; Antippen öffnet eine eigene Bearbeiten-Seite mit Live-Vorschau
-  (aktueller Wert und Ring)
-- Neuer Design-Tab: Hintergrund (Theme, eigene Farbe, transparent) mit
-  Deckkraft, Farbverlauf und Glas-Effekt, Textfarbe mit automatischem Kontrast,
-  Schriftgröße der Werte, Rahmen, Schatten, Eckenradius und Innenabstand
-- Werte, die dem Standard entsprechen, werden nicht mehr in die YAML geschrieben;
-  Farben aus YAML (z. B. Hex) bleiben beim Bearbeiten im Originalformat
-- Behoben: die Schalter „Vom Hausverbrauch abziehen“ standen im Editor auf aus,
-  obwohl die Funktion aktiv war
-- Behoben: `center_background` aus dem Farbwähler ([r,g,b]) wurde nicht angewendet
-- Behoben: ein leerer PV-/Netz-/Speicher-Knoten wird nicht mehr als `{}` gespeichert
+- Editor completely rebuilt, consistent with the Status Summary Card and
+  Trash Card Plus: tab bar (Nodes, Display, Animation, Values, Design),
+  introduction per tab and collapsible groups with icons
+- Nodes tab as a list with the icon in the node color, sensor, sorting and
+  removing; tapping opens a separate edit page with live preview
+  (current value and ring)
+- New Design tab: background (theme, custom color, transparent) with
+  opacity, gradient and glass effect, text color with automatic contrast,
+  font size of the values, border, shadow, corner radius and padding
+- Values that match the default are no longer written to the YAML;
+  colors from YAML (e.g. hex) keep their original format when editing
+- Fixed: the "Subtract from home consumption" switches were shown as off in the
+  editor although the feature was active
+- Fixed: `center_background` from the color picker ([r,g,b]) was not applied
+- Fixed: an empty PV/grid/battery node is no longer saved as `{}`
 
 ## 4.6.1
-- Ring-Variante des Ladestands (`soc_display: ring`) zeigt zusätzlich den
-  Prozentwert im Kreis unter dem Icon, in der Farbe des Ladestands
+- The ring variant of the state of charge (`soc_display: ring`) also shows the
+  percentage inside the circle below the icon, in the state of charge color
 
 ## 4.6.0
-- Ladestand eines Verbrauchers lässt sich an einen Lade-Sensor koppeln:
-  mit `charging_entity` erscheint Batteriesymbol bzw. innerer Ring nur, solange
-  dieser Sensor „lädt“ meldet. Automatisch erkannt werden `on`, `true`,
-  `charging`, `laden`, `lädt`, `ladend`, `active`, `aktiv` und Zahlen über 0;
-  mit `charging_state` lassen sich eigene Zustände festlegen. Beide Felder
-  sind im Editor unter dem Verbraucher einstellbar
+- The state of charge of a consumer can be linked to a charging sensor:
+  with `charging_entity` the battery icon or inner ring only appears while
+  this sensor reports "charging". Automatically recognized are `on`, `true`,
+  `charging`, `laden`, `lädt`, `ladend`, `active`, `aktiv` and numbers above 0;
+  `charging_state` lets you define your own states. Both fields
+  can be set in the editor under the consumer
 
 ## 4.5.0
-- Ladestand für Verbraucher, etwa das Auto an der Wallbox: neuer
-  `state_of_charge` unter `individual` mit zwei Darstellungen über
-  `soc_display` — `battery` (liegende Batterie mit stufenloser Füllung und
-  Prozentwert im Knoten, Standard) oder `ring` (eigener Ring innerhalb des
-  Leistungsrings, voll bei 100 %). Farbe über `soc_color`. Bei `unavailable`
-  oder `unknown` wird die Anzeige ausgeblendet. Im Editor unter jedem
-  Verbraucher einstellbar
-- Der Leistungsring eines Verbrauchers zeigt jetzt immer die Leistung. Wer bisher
-  per YAML einen `state_of_charge` an einem Verbraucher gesetzt hatte, sah dort
-  den Ladestand im Hauptring; der steht jetzt in der neuen Anzeige
-- Behoben: `display_zero_lines.mode: transparency` hatte keine Wirkung, die
-  Linie inaktiver Knoten wird jetzt tatsächlich transparent
-- Behoben: der Regler für die Ringgröße im Editor begann bei 200 statt bei 140
-- Ungenutzte Reste im Code entfernt
+- State of charge for consumers, e.g. the car at the wallbox: new
+  `state_of_charge` under `individual` with two displays via
+  `soc_display` — `battery` (horizontal battery with continuous fill and
+  percentage inside the node, default) or `ring` (own ring inside the
+  power ring, full at 100 %). Color via `soc_color`. For `unavailable`
+  or `unknown` the indicator is hidden. Configurable in the editor under every
+  consumer
+- The power ring of a consumer now always shows the power. If you previously
+  set a `state_of_charge` on a consumer via YAML, you saw the state of charge in the
+  main ring; it is now shown in the new indicator
+- Fixed: `display_zero_lines.mode: transparency` had no effect, the
+  line of inactive nodes now actually becomes transparent
+- Fixed: the ring size slider in the editor started at 200 instead of 140
+- Removed unused leftovers from the code
 
 ## 4.4.0
-- Grundlegend überarbeitet, wie Ring- und Knotengröße berechnet werden: bisher
-  konnte die Karte `ring_radius` und `node_size` bei vielen Konfigurationen
-  heimlich wieder zurückrechnen, sodass die Regler kaum noch etwas bewirkten.
-  Beide Werte wirken jetzt direkt und über den gesamten Regelbereich sichtbar;
-  die einzige verbleibende Grenze ist reine Geometrie (Nachbarknoten dürfen
-  sich nicht berühren). Passt die Größe nicht mehr in die 1000er-Grundfläche,
-  wächst die Zeichenfläche mit statt Ring oder Knoten zu verkleinern
-- Beispielbilder mit dieser Geometrie neu erzeugt; der Generator misst
-  Textbreiten jetzt exakt statt sie zu schätzen, damit auch lange Namen wie
-  „Wärmepumpe" nicht mehr abgeschnitten werden
+- Fundamentally reworked how ring and node size are calculated: previously
+  the card could silently recalculate `ring_radius` and `node_size` in many configurations,
+  so the sliders barely had an effect.
+  Both values are now applied directly and are visible over the whole range;
+  the only remaining limit is pure geometry (neighboring nodes must
+  not touch). If the size no longer fits into the 1000-unit base area,
+  the drawing area grows instead of shrinking the ring or the nodes
+- Example images regenerated with this geometry; the generator now measures
+  text widths exactly instead of estimating them, so long names like
+  "Wärmepumpe" are no longer cut off
 
 ## 4.3.0
-- Standardgeometrie überarbeitet: Speichen und Punktschweife waren bei den
-  Standardwerten kaum sichtbar, bei drei oder vier Knoten überlappten sich
-  Knoten und Nabe sogar rechnerisch. Ring ist jetzt größer, Knoten kleiner,
-  betrifft neue Karten sofort und bestehende nach dem Zurücksetzen von
-  `ring_radius`, `node_size` oder `center_size` auf die Standardwerte
-- Beispielbilder mit derselben Geometrie neu erzeugt, zwei weitere ergänzt
-  (zwei Knoten als engster Fall, zwölf Knoten als praktische Obergrenze)
+- Reworked default geometry: spokes and dot tails were barely visible with the
+  default values, with three or four nodes, nodes and hub even overlapped
+  mathematically. The ring is now larger and the nodes smaller; this
+  affects new cards immediately and existing ones after resetting
+  `ring_radius`, `node_size` or `center_size` to the defaults
+- Example images regenerated with the same geometry, two more added
+  (two nodes as the tightest case, twelve nodes as the practical upper limit)
 
 ## 4.2.0
-- Schriftstärke des Titels einstellbar, von leicht bis sehr fett
+- Title font weight configurable, from light to extra bold
 
 ## 4.1.0
-- Ring wird bei 0 % vollständig ausgeblendet; vorher blieb die runde Linienkappe
-  als kleiner Punkt stehen
-- Mehr Beispielkonfigurationen samt Bildern, neutrale Nabe in der Dokumentation
+- The ring is hidden completely at 0 %; previously the round line cap
+  remained visible as a small dot
+- More example configurations including images, neutral hub in the documentation
 
 ## 4.0.0
-- Titel liegt als Overlay über der Grafik und verschiebt sie nicht mehr
-- Titelfarbe, Titelgröße und Ausrichtung einstellbar
-- Editor in vier Gruppen mit Kurzhinweisen neu geordnet
+- The title is an overlay on top of the graphic and no longer pushes it down
+- Title color, title size and alignment configurable
+- Editor reorganized into four groups with short hints
 
 ## 3.4.0
-- Tempo-Regler über alle Linien, schnellere Standardwerte
-- Pause zwischen zwei Durchläufen einstellbar
+- Speed slider for all lines, faster defaults
+- Pause between two cycles configurable
 
 ## 3.3.0
-- Getrennte Sensoren für Laden und Entladen sowie Bezug und Einspeisung
-- Übergangsdauer des Rings einstellbar
+- Separate sensors for charging and discharging as well as import and export
+- Ring transition duration configurable
 
 ## 3.2.0
-- Punkte laufen über einen eigenen Zeitgeber statt über SMIL; Wertänderungen
-  setzen die Animation nicht mehr zurück
+- Dots are moved by the card's own timer instead of SMIL; value changes
+  no longer reset the animation
 
 ## 3.1.0
-- Ringhintergrund in Knotenfarbe, Knoten bleiben bei 0 W farbig
-- Batteriesymbol mit Balken nach Ladestand und Prozentanzeige
-- Füllfarbe für die Mitte, Ringübergang über stroke-dashoffset
+- Ring background in the node color, nodes stay colored at 0 W
+- Battery icon with bars by state of charge and percentage display
+- Fill color for the center, ring transition via stroke-dashoffset
 
 ## 3.0.0
-- Teilringe nach Maximalleistung, Ladestand beim Speicher
-- Ein Punkt je Linie mit Schweif
-- Eigener Icon-Satz, Reihenfolge der Verbraucher änderbar
-- Abzug einzelner Verbraucher vom Hausverbrauch
+- Partial rings by maximum power, state of charge for the battery
+- One dot per line with a tail
+- Own icon set, order of the consumers can be changed
+- Subtracting individual consumers from the home consumption
 
 ## 2.0.0
-- Konfigurationseditor mit Entity-, Icon- und Farbwähler
+- Configuration editor with entity, icon and color pickers
 
 ## 1.0.0
-- Erste Fassung: radiale Darstellung, Aktionen je Knoten
+- First version: radial layout, actions per node

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Erzeugt die Beispielbilder fuer die Dokumentation.
+"""Generates the example images for the documentation.
 
-Zeichnet denselben Aufbau wie die Karte (Ring, Knoten, Speichen, Punkt mit
-Schweif) als statisches SVG und rendert es nach PNG.
+Draws the same layout as the card (ring, nodes, spokes, dot with tail)
+as a static SVG and renders it to PNG.
 """
 import math, os, sys
 import cairosvg
@@ -12,9 +12,8 @@ _measure_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 10, 10)
 _measure_ctx = cairo.Context(_measure_surface)
 
 def text_advance(text, font_size, bold=False):
-    """Exakte Zeichenbreite über die Rendering-Bibliothek selbst — keine
-    geschätzten Pro-Zeichen-Konstanten, die je nach verfügbarer Schriftart
-    daneben liegen können."""
+    """Exact text width from the rendering library itself — no estimated
+    per-character constants that can be off depending on the available font."""
     _measure_ctx.select_font_face(
         "Roboto,Helvetica,Arial,sans-serif",
         cairo.FONT_SLANT_NORMAL,
@@ -24,12 +23,12 @@ def text_advance(text, font_size, bold=False):
     return _measure_ctx.text_extents(text)[4]  # x_advance
 
 BASE_VB = 1000
-HUB_R, GAP = 44, 14                  # entspricht den Standardwerten der Karte ab 4.4.0
-BASE_NODE_R, OVERLAP_GAP = 92, 0.9   # reine Geometrie statt Schätzfaktor: Radius darf
-                                      # höchstens so groß werden, wie es der Abstand
-                                      # zum Nachbarknoten erlaubt
+HUB_R, GAP = 44, 14                  # matches the card defaults since 4.4.0
+BASE_NODE_R, OVERLAP_GAP = 92, 0.9   # pure geometry instead of an estimate: the radius may
+                                      # only grow as large as the distance to the
+                                      # neighboring node allows
 
-# Optional nur einzelne Bilder erzeugen: python3 tools/render_examples.py example-soc-ring.png
+# Optionally render single images only: python3 tools/render_examples.py example-soc-ring.png
 ONLY = set(sys.argv[1:])
 
 def clamp(v, lo, hi):
@@ -91,7 +90,7 @@ def esc(text):
 
 def fmt(w):
     if abs(w) >= 1000:
-        return f"{w/1000:.2f}".replace(".", ","), "kW"
+        return f"{w/1000:.2f}", "kW"
     return f"{w:.0f}", "W"
 
 def render(nodes, out, title=None, title_color=None, center=None, theme=DARK,
@@ -105,13 +104,12 @@ def render(nodes, out, title=None, title_color=None, center=None, theme=DARK,
     n = len(nodes)
     step = 360 / n
 
-    # Direkte Übernahme der Werte, keine verdeckte Rückrechnung: die einzige
-    # Grenze für die Knotengröße ist die reine Geometrie (Nachbarknoten dürfen
-    # sich nicht berühren). Das Beschriftungsfeld ist an der Kartenbreite
-    # orientiert, nicht an der Koordinatenfläche — sein Platzbedarf wächst
-    # also mit VB mit. Deshalb wird die nötige Fläche aus dem tatsächlich
-    # längsten Text dieses Bildes gelöst, statt mit einem festen Wert zu
-    # schätzen (der bei langen Namen oder größerem VB Text abschneiden kann).
+    # Values are taken over directly, no hidden recalculation: the only limit
+    # for the node size is pure geometry (neighboring nodes must not touch).
+    # The label area is based on the card width, not on the coordinate area —
+    # so its space requirement grows with VB. That's why the required area is
+    # solved from the actually longest text of this image instead of using a
+    # fixed estimate (which could cut off long names or a larger VB).
     ring_r = clamp(ring_radius, 140, 400)
     desired_r = BASE_NODE_R * clamp(node_size, 0.5, 1.8)
     no_overlap_r = ring_r * math.sin(math.pi / n) * OVERLAP_GAP
@@ -125,8 +123,8 @@ def render(nodes, out, title=None, title_color=None, center=None, theme=DARK,
         return w
 
     max_text_w = max((text_width(nd) for nd in nodes), default=0)
-    text_frac = min(max_text_w / BASE_VB, 0.45)   # Deckel gegen Division ins Negative bei sehr langen Namen
-    node_extra = 1.12   # 12 % zusätzlicher Abstand Knotenrand -> Textanfang
+    text_frac = min(max_text_w / BASE_VB, 0.45)   # cap against dividing into negative values for very long names
+    node_extra = 1.12   # 12 % extra distance node edge -> text start
     half = max(BASE_VB / 2, (ring_r + node_extra * node_r) / (1 - 2 * text_frac))
     VB = half * 2
     CX = CY = half
@@ -136,8 +134,8 @@ def render(nodes, out, title=None, title_color=None, center=None, theme=DARK,
     circ = 2 * math.pi * arc_r
 
     parts = [f'<rect width="{VB}" height="{VB}" rx="34" fill="{CARD_BG}"/>']
-    # Textgrößen sind wie bei der Karte an der physischen Kartenbreite orientiert,
-    # nicht an der (variablen) Koordinatenfläche — deshalb mit VB mitskalieren.
+    # Like in the card, text sizes are based on the physical card width,
+    # not on the (variable) coordinate area — so they scale with VB.
     fs = VB / BASE_VB
     if title:
         parts.append(f'<text x="{42*fs:.1f}" y="{70*fs:.1f}" font-size="{40*fs:.1f}" font-weight="500" '
@@ -163,7 +161,7 @@ def render(nodes, out, title=None, title_color=None, center=None, theme=DARK,
             f'stroke-opacity="{0 if pct < 0.004 else 1}" '
             f'stroke-dasharray="{circ*pct:.1f} {circ:.1f}" transform="rotate(-90 {px:.1f} {py:.1f})"/>')
 
-        # Ladestand eines Verbrauchers: Variante "ring" (innerer Ring) oder "battery"
+        # State of charge of a consumer: variant "ring" (inner ring) or "battery"
         ev_soc, soc_mode = nd.get("ev_soc"), nd.get("soc_mode", "battery")
         soc_col = nd.get("soc_color", GREEN)
         if ev_soc is not None and soc_mode == "ring":
@@ -187,7 +185,7 @@ def render(nodes, out, title=None, title_color=None, center=None, theme=DARK,
         if badge:
             txt = f"{round(ev_soc*100)} %"
             fsz = node_r * 0.28
-            glyph = soc_mode == "battery"          # Ring-Variante: nur die Zahl
+            glyph = soc_mode == "battery"          # ring variant: number only
             bw, bh = (node_r * 0.44, node_r * 0.22) if glyph else (0, 0)
             gap = node_r * 0.06 if glyph else 0
             tw = text_advance(txt, fsz, bold=True)
@@ -228,8 +226,8 @@ def render(nodes, out, title=None, title_color=None, center=None, theme=DARK,
             lx = px
             ly = py + node_r + 52 * fs if uy > 0 else py - node_r - (72 if show_names else 34) * fs
         else:
-            # Derselbe Abstand, der auch in die Flächengleichung oben eingeht —
-            # sonst passt die Reservierung nicht zur tatsächlichen Position.
+            # The same distance that goes into the area equation above —
+            # otherwise the reservation doesn't match the actual position.
             lx = px + (node_r * node_extra) * (1 if ux > 0 else -1)
             ly = py - 2 * fs if show_names else py + 14 * fs
         val, unit = fmt(nd["value"])
@@ -273,127 +271,127 @@ p = lambda f: os.path.join(outdir, f)
 
 N = lambda name, icon, color, value, **kw: dict(name=name, icon=icon, color=color, value=value, **kw)
 
-# 1 Minimal: PV, Haus, Netz
+# 1 Minimal: solar, home, grid
 render([
-    N("PV", "solar", AMBER, 3820, pct=0.42, inward=True, phase=0.6),
-    N("Haus", "home", BLUE, 1240, phase=0.45),
-    N("Netz", "grid", GREY, 2580, phase=0.35),
-], p("example-minimal.png"), title="Energie")
+    N("Solar", "solar", AMBER, 3820, pct=0.42, inward=True, phase=0.6),
+    N("Home", "home", BLUE, 1240, phase=0.45),
+    N("Grid", "grid", GREY, 2580, phase=0.35),
+], p("example-minimal.png"), title="Energy")
 
-# 2 Standard: sechs Knoten
+# 2 Standard: six nodes
 render([
-    N("PV", "solar", AMBER, 7560, pct=0.76, inward=True, phase=0.72),
-    N("Haus", "home", BLUE, 1870, phase=0.5),
+    N("Solar", "solar", AMBER, 7560, pct=0.76, inward=True, phase=0.72),
+    N("Home", "home", BLUE, 1870, phase=0.5),
     N("Wallbox", "ev", PURPLE, 0, pct=0.0),
-    N("Wärmepumpe", "heatpump", ORANGE, 1450, phase=0.4),
-    N("Speicher", "battery", GREEN, 2400, pct=0.72, soc=0.72, soc_text="72 %", phase=0.55),
-    N("Netz", "grid", GREY, 1840, phase=0.6),
-], p("example-standard.png"), title="Energiefluss")
+    N("Heat pump", "heatpump", ORANGE, 1450, phase=0.4),
+    N("Battery", "battery", GREEN, 2400, pct=0.72, soc=0.72, soc_text="72 %", phase=0.55),
+    N("Grid", "grid", GREY, 1840, phase=0.6),
+], p("example-standard.png"), title="Energy flow")
 
-# 3 Viele Verbraucher
+# 3 Many consumers
 render([
-    N("PV", "solar", AMBER, 9240, pct=0.92, inward=True, phase=0.8),
-    N("Haus", "home", BLUE, 640, phase=0.5),
+    N("Solar", "solar", AMBER, 9240, pct=0.92, inward=True, phase=0.8),
+    N("Home", "home", BLUE, 640, phase=0.5),
     N("Wallbox", "ev", PURPLE, 7200, phase=0.62),
-    N("Wärmepumpe", "heatpump", ORANGE, 980, phase=0.45),
-    N("Waschküche", "wash", TEAL, 620, phase=0.4),
+    N("Heat pump", "heatpump", ORANGE, 980, phase=0.45),
+    N("Laundry", "wash", TEAL, 620, phase=0.4),
     N("Pool", "pool", DBLUE, 310, phase=0.3),
-    N("Büro", "home", PINK, 0, pct=0.0),
-    N("Speicher", "battery", GREEN, 1100, pct=0.38, soc=0.38, soc_text="38 %", phase=0.5),
-    N("Netz", "grid", GREY, 1430, inward=True, phase=0.55),
-], p("example-large.png"), title="Hausübersicht")
+    N("Office", "home", PINK, 0, pct=0.0),
+    N("Battery", "battery", GREEN, 1100, pct=0.38, soc=0.38, soc_text="38 %", phase=0.5),
+    N("Grid", "grid", GREY, 1430, inward=True, phase=0.55),
+], p("example-large.png"), title="House overview")
 
-# 4 Kompakt: ohne Namen, ohne Titel
+# 4 Compact: no names, no title
 render([
-    N("PV", "solar", AMBER, 4480, pct=0.45, inward=True, phase=0.6),
-    N("Haus", "home", BLUE, 1320, phase=0.5),
-    N("Speicher", "battery", GREEN, 2100, pct=0.64, soc=0.64, soc_text="64 %", phase=0.45),
-    N("Netz", "grid", GREY, 1060, phase=0.4),
+    N("Solar", "solar", AMBER, 4480, pct=0.45, inward=True, phase=0.6),
+    N("Home", "home", BLUE, 1320, phase=0.5),
+    N("Battery", "battery", GREEN, 2100, pct=0.64, soc=0.64, soc_text="64 %", phase=0.45),
+    N("Grid", "grid", GREY, 1060, phase=0.4),
 ], p("example-compact.png"), show_names=False, node_size=1.1)
 
-# 5 Nacht: keine Erzeugung, Speicher versorgt das Haus
+# 5 Night: no generation, the battery supplies the house
 render([
-    N("PV", "solar", AMBER, 0, pct=0.0),
-    N("Haus", "home", BLUE, 940, phase=0.5),
-    N("Wärmepumpe", "heatpump", ORANGE, 1180, phase=0.42),
-    N("Speicher", "battery", GREEN, 2120, pct=0.31, soc=0.31, soc_text="31 %",
+    N("Solar", "solar", AMBER, 0, pct=0.0),
+    N("Home", "home", BLUE, 940, phase=0.5),
+    N("Heat pump", "heatpump", ORANGE, 1180, phase=0.42),
+    N("Battery", "battery", GREEN, 2120, pct=0.31, soc=0.31, soc_text="31 %",
       inward=True, phase=0.6),
-    N("Netz", "grid", GREY, 0, pct=0.0),
-], p("example-night.png"), title="Nachts")
+    N("Grid", "grid", GREY, 0, pct=0.0),
+], p("example-night.png"), title="Night")
 
-# 6 Laden: Überschuss geht in Speicher und Wallbox
+# 6 Charging: surplus goes into the battery and the wallbox
 render([
-    N("PV", "solar", AMBER, 8900, pct=0.89, inward=True, phase=0.75),
-    N("Haus", "home", BLUE, 520, phase=0.5),
+    N("Solar", "solar", AMBER, 8900, pct=0.89, inward=True, phase=0.75),
+    N("Home", "home", BLUE, 520, phase=0.5),
     N("Wallbox", "ev", PURPLE, 4200, phase=0.55),
-    N("Speicher", "battery", GREEN, 3600, pct=0.54, soc=0.54, soc_text="54 %", phase=0.5),
-    N("Netz", "grid", GREY, 580, phase=0.35),
-], p("example-charging.png"), title="Überschuss")
+    N("Battery", "battery", GREEN, 3600, pct=0.54, soc=0.54, soc_text="54 %", phase=0.5),
+    N("Grid", "grid", GREY, 580, phase=0.35),
+], p("example-charging.png"), title="Surplus")
 
-# 7 Heizung: mehrere Kreise mit eigenem Icon-Satz
+# 7 Heating: several circuits with the own icon set
 render([
-    N("PV", "solar", AMBER, 2140, pct=0.21, inward=True, phase=0.55),
-    N("Haus", "home", BLUE, 430, phase=0.5),
-    N("Wärmepumpe", "heatpump", ORANGE, 2450, phase=0.6),
-    N("Heizstab", "heatpump", RED, 0, pct=0.0),
-    N("Fußboden", "pool", LIME, 180, phase=0.3),
-    N("Netz", "grid", GREY, 2920, inward=True, phase=0.65),
-], p("example-heating.png"), title="Heizung")
+    N("Solar", "solar", AMBER, 2140, pct=0.21, inward=True, phase=0.55),
+    N("Home", "home", BLUE, 430, phase=0.5),
+    N("Heat pump", "heatpump", ORANGE, 2450, phase=0.6),
+    N("Heating element", "heatpump", RED, 0, pct=0.0),
+    N("Floor heating", "pool", LIME, 180, phase=0.3),
+    N("Grid", "grid", GREY, 2920, inward=True, phase=0.65),
+], p("example-heating.png"), title="Heating")
 
-# 8 Helles Thema
+# 8 Light theme
 render([
-    N("PV", "solar", "#e0a020", 5120, pct=0.51, inward=True, phase=0.65),
-    N("Haus", "home", "#2f95c4", 980, phase=0.5),
+    N("Solar", "solar", "#e0a020", 5120, pct=0.51, inward=True, phase=0.65),
+    N("Home", "home", "#2f95c4", 980, phase=0.5),
     N("Wallbox", "ev", "#8c5cc0", 1600, phase=0.45),
-    N("Speicher", "battery", "#3f9e5c", 3200, pct=0.88, soc=0.88, soc_text="88 %", phase=0.5),
-    N("Netz", "grid", "#6f7883", 940, phase=0.4),
-], p("example-light.png"), title="Helles Thema", theme=LIGHT)
+    N("Battery", "battery", "#3f9e5c", 3200, pct=0.88, soc=0.88, soc_text="88 %", phase=0.5),
+    N("Grid", "grid", "#6f7883", 940, phase=0.4),
+], p("example-light.png"), title="Light theme", theme=LIGHT)
 
-# 9 Zwei Knoten: der engste sinnvolle Fall
+# 9 Two nodes: the tightest sensible case
 render([
-    N("PV", "solar", AMBER, 2860, pct=0.29, inward=True, phase=0.6),
-    N("Haus", "home", BLUE, 2860, phase=0.5),
-], p("example-two-nodes.png"), title="Minimalfall")
+    N("Solar", "solar", AMBER, 2860, pct=0.29, inward=True, phase=0.6),
+    N("Home", "home", BLUE, 2860, phase=0.5),
+], p("example-two-nodes.png"), title="Minimal case")
 
-# 10 Zwölf Knoten: die praktische Obergrenze
+# 10 Twelve nodes: the practical upper limit
 render([
-    N("PV", "solar", AMBER, 6200, pct=0.62, inward=True, phase=0.7),
-    N("Haus", "home", BLUE, 480, phase=0.5),
+    N("Solar", "solar", AMBER, 6200, pct=0.62, inward=True, phase=0.7),
+    N("Home", "home", BLUE, 480, phase=0.5),
     N("Wallbox", "ev", PURPLE, 3600, phase=0.55),
-    N("Wärmepumpe", "heatpump", ORANGE, 890, phase=0.4),
-    N("Waschküche", "wash", TEAL, 410, phase=0.35),
-    N("Trockner", "wash", "#7aa8d1", 0, pct=0.0),
+    N("Heat pump", "heatpump", ORANGE, 890, phase=0.4),
+    N("Laundry", "wash", TEAL, 410, phase=0.35),
+    N("Dryer", "wash", "#7aa8d1", 0, pct=0.0),
     N("Pool", "pool", DBLUE, 260, phase=0.3),
-    N("Büro", "home", PINK, 190, phase=0.28),
+    N("Office", "home", PINK, 190, phase=0.28),
     N("Sauna", "heatpump", RED, 0, pct=0.0),
-    N("Werkstatt", "home", LIME, 340, phase=0.32),
-    N("Speicher", "battery", GREEN, 1450, pct=0.42, soc=0.42, soc_text="42 %", phase=0.45),
-    N("Netz", "grid", GREY, 780, phase=0.38),
-], p("example-twelve-nodes.png"), title="Zwölf Knoten", node_size=0.85)
+    N("Workshop", "home", LIME, 340, phase=0.32),
+    N("Battery", "battery", GREEN, 1450, pct=0.42, soc=0.42, soc_text="42 %", phase=0.45),
+    N("Grid", "grid", GREY, 780, phase=0.38),
+], p("example-twelve-nodes.png"), title="Twelve nodes", node_size=0.85)
 
-# 11 Wallbox mit Ladestand des Autos, Variante 1: Batteriesymbol im Knoten
+# 11 Wallbox with the car's state of charge, variant 1: battery icon in the node
 render([
-    N("PV", "solar", AMBER, 6200, pct=0.62, inward=True, phase=0.7),
-    N("Haus", "home", BLUE, 1480, phase=0.5),
+    N("Solar", "solar", AMBER, 6200, pct=0.62, inward=True, phase=0.7),
+    N("Home", "home", BLUE, 1480, phase=0.5),
     N("Wallbox", "car", PURPLE, 3700, pct=0.34, ev_soc=0.64, soc_mode="battery", phase=0.55),
-    N("Speicher", "battery", GREEN, 1200, pct=0.72, soc=0.72, soc_text="72 %", phase=0.45),
-    N("Netz", "grid", GREY, 180, phase=0.35),
+    N("Battery", "battery", GREEN, 1200, pct=0.72, soc=0.72, soc_text="72 %", phase=0.45),
+    N("Grid", "grid", GREY, 180, phase=0.35),
 ], p("example-soc-battery.png"), title="Wallbox")
 
-# 12 Dasselbe, Variante 2: innerer Ring (voll = 100 %), eigene Farbe
+# 12 The same, variant 2: inner ring (full = 100 %), own color
 render([
-    N("PV", "solar", AMBER, 6200, pct=0.62, inward=True, phase=0.7),
-    N("Haus", "home", BLUE, 1480, phase=0.5),
+    N("Solar", "solar", AMBER, 6200, pct=0.62, inward=True, phase=0.7),
+    N("Home", "home", BLUE, 1480, phase=0.5),
     N("Wallbox", "car", PURPLE, 3700, pct=0.34, ev_soc=0.64, soc_mode="ring",
       soc_color=BLUE, phase=0.55),
-    N("Speicher", "battery", GREEN, 1200, pct=0.72, soc=0.72, soc_text="72 %", phase=0.45),
-    N("Netz", "grid", GREY, 180, phase=0.35),
+    N("Battery", "battery", GREEN, 1200, pct=0.72, soc=0.72, soc_text="72 %", phase=0.45),
+    N("Grid", "grid", GREY, 180, phase=0.35),
 ], p("example-soc-ring.png"), title="Wallbox")
 
-# Titelbild
+# Hero image
 render([
-    N("PV", "solar", AMBER, 5120, pct=0.51, inward=True, phase=0.65),
-    N("Haus", "home", BLUE, 980, phase=0.5),
-    N("Speicher", "battery", GREEN, 3200, pct=0.88, soc=0.88, soc_text="88 %", phase=0.5),
-    N("Netz", "grid", GREY, 940, phase=0.45),
+    N("Solar", "solar", AMBER, 5120, pct=0.51, inward=True, phase=0.65),
+    N("Home", "home", BLUE, 980, phase=0.5),
+    N("Battery", "battery", GREEN, 3200, pct=0.88, soc=0.88, soc_text="88 %", phase=0.5),
+    N("Grid", "grid", GREY, 940, phase=0.45),
 ], p("hero.png"), show_names=False, node_size=1.1, width=640)

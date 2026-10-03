@@ -1,24 +1,24 @@
-# Titel links, Wetter automatisch rechts daneben in der Ecke.
+# Title on the left, weather automatically in the opposite corner on the right.
 type: custom:radial-flow-card
-title: Energiefluss
+title: Energy flow
 title_size: 18
 title_weight: 600
 
 weather_entity: weather.forecast_home
-# optional: eigener Außenfühler statt der Temperatur der Wetterentität
-# weather_temperature_entity: sensor.aussentemperatur
-weather_position: auto      # auto = gegenüber dem Titel, sonst left / right
+# optional: own outdoor sensor instead of the weather entity's temperature
+# weather_temperature_entity: sensor.outdoor_temperature
+weather_position: auto      # auto = opposite the title, otherwise left / right
 weather_size: 16
 weather_decimals: 0
 weather_show_condition: false
-weather_icon_style: color   # oder mono
+weather_icon_style: color   # or mono
 
 solar:
-  entity: sensor.pv_leistung
+  entity: sensor.pv_power
   max_power: 10000
 
 grid:
-  entity: sensor.netz_leistung
+  entity: sensor.grid_power
 
 home:
-  entity: sensor.hausverbrauch
+  entity: sensor.home_consumption

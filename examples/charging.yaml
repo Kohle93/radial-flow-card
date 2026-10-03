@@ -1,23 +1,23 @@
-# Überschussbetrieb: PV lädt Speicher und Wallbox, Rest geht ins Netz.
+# Surplus: PV charges the battery and the wallbox, the rest goes to the grid.
 type: custom:radial-flow-card
-title: Überschuss
+title: Surplus
 speed: 2
 
 solar:
-  entity: sensor.pv_leistung
+  entity: sensor.pv_power
   max_power: 10000
 grid:
   entity:
-    consumption: sensor.netz_bezug
-    production: sensor.netz_einspeisung
+    consumption: sensor.grid_import
+    production: sensor.grid_export
 battery:
   entity:
-    discharge: sensor.speicher_entladeleistung
-    charge: sensor.speicher_ladeleistung
-  state_of_charge: sensor.speicher_soc
+    discharge: sensor.battery_discharge_power
+    charge: sensor.battery_charge_power
+  state_of_charge: sensor.battery_soc
 
 individual:
-  - entity: sensor.wallbox_leistung
+  - entity: sensor.wallbox_power
     name: Wallbox
     icon: mdi:ev-station
     color: "#a97bd6"

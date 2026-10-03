@@ -1,14 +1,14 @@
-# Ohne Namen und ohne Titel: dichte Kachel für ein Übersichtsdashboard.
+# No names and no title: a dense tile for an overview dashboard.
 type: custom:radial-flow-card
 show_names: false
 node_size: 1.1
 card_width: 96
 
 solar:
-  entity: sensor.pv_leistung
+  entity: sensor.pv_power
   max_power: 10000
 grid:
-  entity: sensor.netz_leistung
+  entity: sensor.grid_power
 battery:
-  entity: sensor.speicher_leistung
-  state_of_charge: sensor.speicher_soc
+  entity: sensor.battery_power
+  state_of_charge: sensor.battery_soc
