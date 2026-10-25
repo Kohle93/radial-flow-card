@@ -6,7 +6,7 @@
  * Kein Build-Schritt nötig — Datei als Modul-Ressource einbinden.
  */
 
-const VERSION = "5.4.0";
+const VERSION = "5.5.0";
 
 /* ==================================================================
    Defaults
@@ -90,6 +90,7 @@ const PALETTE = {
   grid: "#8e98a4",
 };
 const DEFAULT_SOC_COLOR = "#5cc47a";
+const DEFAULT_PV2_COLOR = "#e8833a";   // zweiter Wechselrichter, sichtbar anders als die PV-Farbe
 const INDIVIDUAL_PALETTE = [
   "#a97bd6", "#e8833a", "#5fb0a8", "#4c8ad9", "#d1637f", "#c9a227", "#7f9f3a", "#c76a4e",
 ];
@@ -727,6 +728,12 @@ class RadialFlowCard extends HTMLElement {
           ? (SOC_DISPLAY_MODES.includes(conf.soc_display) ? conf.soc_display : "battery")
           : "none",
       soc_color: toColor(conf.soc_color, DEFAULT_SOC_COLOR),
+      // Zweiter Wechselrichter (nur PV): wird zur PV-Leistung addiert, bekommt einen
+      // inneren Ring in eigener Farbe. Der Wert steht immer in der Knotenbeschriftung.
+      second_entity: type === "solar" ? conf.second_entity : undefined,
+      second_max_power: conf.second_max_power,
+      second_color: toColor(conf.second_color, DEFAULT_PV2_COLOR),
+      second_display: type === "solar" && conf.second_entity && conf.second_display !== "none" ? "ring" : "none",
       // Optional: Ladestand nur zeigen, solange dieser Sensor "lädt" meldet
       charging_entity: conf.charging_entity,
       charging_state: conf.charging_state,
@@ -863,6 +870,17 @@ class RadialFlowCard extends HTMLElement {
             transform="rotate(-90 ${px} ${py})"/>`;
       }
 
+      // Zweiter Wechselrichter: innerer Ring in eigener Farbe, wie der Ladestand
+      if (n.second_display === "ring") {
+        rings += `<circle class="soc-track" cx="${px}" cy="${py}" r="${socR.toFixed(1)}"
+            stroke="${n.second_color}" stroke-width="${socStrokeW.toFixed(1)}"/>
+          <circle class="soc-ring" id="pr-${n.key}" cx="${px}" cy="${py}" r="${socR.toFixed(1)}"
+            stroke="${n.second_color}" stroke-width="${socStrokeW.toFixed(1)}" stroke-linecap="round"
+            stroke-dasharray="${socCirc.toFixed(1)} ${socCirc.toFixed(1)}"
+            stroke-dashoffset="${socCirc.toFixed(1)}" stroke-opacity="0"
+            transform="rotate(-90 ${px} ${py})"/>`;
+      }
+
       // Genau ein Punkt je Linie, dahinter der Schweif.
       // Bewegt wird per eigenem Zeitgeber, nicht per SMIL.
       n._dots = [];
@@ -915,6 +933,9 @@ class RadialFlowCard extends HTMLElement {
         socPct: root.querySelector(".soc-pct"),
         socRing: this.shadowRoot.getElementById(`sr-${n.key}`),
         socTrack: this.shadowRoot.getElementById(`st-${n.key}`),
+        pvRing: this.shadowRoot.getElementById(`pr-${n.key}`),
+        pvA: root.querySelector(".pv-a"),
+        pvB: root.querySelector(".pv-b"),
         lastSoc: undefined,
         dots: n._dots.map((d) => ({
           el: this.shadowRoot.getElementById(`d-${d.id}`),
@@ -1084,6 +1105,9 @@ class RadialFlowCard extends HTMLElement {
         <div class="label">
           <div class="line1"><span class="value">0</span><span class="unit">W</span></div>
           <div class="name"></div>
+          ${n.second_entity
+            ? `<div class="pv-split"><span class="pv-a" style="color:${n.color};"></span><span class="pv-sep"> · </span><span class="pv-b" style="color:${n.second_color};"></span></div>`
+            : ""}
           <div class="extra"></div>
         </div>
       </div>`;
@@ -1180,6 +1204,9 @@ class RadialFlowCard extends HTMLElement {
       .soc-track { fill: none; stroke-opacity: ${clamp(c.track_opacity ?? 0.22, 0, 1)}; }
       .soc-ring { fill: none; transition: stroke-dashoffset ${clamp(c.ring_transition ?? 400, 0, 3000)}ms cubic-bezier(.4,0,.2,1); }
 
+      /* Zwei PV-Wechselrichter: Werte unter dem Summenwert, jeweils in ihrer Farbe */
+      .pv-split { font-size: ${(2.6 * fs).toFixed(2)}cqw; font-weight: 600; white-space: nowrap; color: var(--rf-text2, var(--secondary-text-color)); }
+
       .label { position: absolute; white-space: nowrap; line-height: 1.2; }
       .node.right .label { left: 106%; top: 50%; transform: translateY(-50%); text-align: left; }
       .node.left  .label { right: 106%; top: 50%; transform: translateY(-50%); text-align: right; }
@@ -1227,6 +1254,9 @@ class RadialFlowCard extends HTMLElement {
 
     const raw = {};
     this._nodes.forEach((n) => { raw[n.key] = readEntity(hass, n.entity, n.invert); });
+    // Zweiter Wechselrichter (nur PV), wird unten zur PV-Leistung addiert
+    const pv2Raw = {};
+    this._nodes.forEach((n) => { if (n.second_entity) pv2Raw[n.key] = Math.abs(readEntity(hass, n.second_entity, false)); });
 
     const solarNode = this._nodes.find((n) => n.type === "solar");
     const gridNode = this._nodes.find((n) => n.type === "grid");
@@ -1234,7 +1264,9 @@ class RadialFlowCard extends HTMLElement {
     const homeNode = this._nodes.find((n) => n.type === "home");
     const individuals = this._nodes.filter((n) => n.type === "individual");
 
-    const solar = solarNode ? Math.abs(raw[solarNode.key]) : 0;
+    const pvA = solarNode ? Math.abs(raw[solarNode.key]) : 0;          // Wechselrichter 1
+    const pvB = solarNode && pv2Raw[solarNode.key] !== undefined ? pv2Raw[solarNode.key] : 0;   // Wechselrichter 2
+    const solar = pvA + pvB;                                        // Summe: Hausbilanz und Fluss
     const grid = gridNode ? raw[gridNode.key] : 0;   // + = Bezug
     const batt = battNode ? raw[battNode.key] : 0;   // + = Entladen
 
@@ -1283,7 +1315,8 @@ class RadialFlowCard extends HTMLElement {
       r.root.classList.toggle("off", !on);
 
       // Ring über stroke-dashoffset, damit der Übergang weich interpoliert
-      const pct = this._ringPercent(n, s.v);
+      // Der äußere PV-Ring zeigt nur Wechselrichter 1, der innere Ring Wechselrichter 2
+      const pct = this._ringPercent(n, n.type === "solar" ? pvA : s.v);
       const offset = +((1 - pct) * circ).toFixed(1);
       if (r.lastOffset !== offset) {
         r.ring.setAttribute("stroke-dashoffset", offset);
@@ -1331,6 +1364,21 @@ class RadialFlowCard extends HTMLElement {
             r.socTrack.style.display = has ? "" : "none";
           }
         }
+      }
+
+      // Zweiter Wechselrichter: innerer Ring und beide Werte in ihren Farben
+      if (n.second_entity) {
+        const pct2 = this._pv2Percent(n, pvB);
+        if (r.pvRing) {
+          r.pvRing.setAttribute("stroke-dashoffset", ((1 - pct2) * this._geo.socCirc).toFixed(1));
+          r.pvRing.setAttribute("stroke-opacity", pct2 < 0.004 ? "0" : "1");
+        }
+        const [va, ua] = this._format(pvA, n);
+        const [vb, ub] = this._format(pvB, n);
+        const ta = `${va} ${ua}`;
+        const tb = `${vb} ${ub}`;
+        if (r.pvA.textContent !== ta) r.pvA.textContent = ta;
+        if (r.pvB.textContent !== tb) r.pvB.textContent = tb;
       }
 
       const mode = c.display_zero_lines.mode;
@@ -1460,6 +1508,12 @@ class RadialFlowCard extends HTMLElement {
     return 1;
   }
 
+  /** Anteil des zweiten Wechselrichters: eigene Maximalleistung, sonst die der PV. */
+  _pv2Percent(n, value) {
+    const max = n.second_max_power > 0 ? n.second_max_power : n.max_power;
+    return max > 0 ? clamp(value / max, 0, 1) : 1;
+  }
+
   /** Ladestand eines Verbrauchers als 0..1, null wenn nicht verfügbar. */
   _socPercent(n) {
     const st = n.state_of_charge ? this._hass.states[n.state_of_charge] : null;
@@ -1547,7 +1601,7 @@ const T_DE = {
     number: "Zahlenformat", zero: "Darstellung bei 0 W",
     card_bg: "Karte – Hintergrund & Transparenz", text: "Text", card_frame: "Karte – Rahmen, Form & Abstände",
     sensor: "Sensor", look: "Name, Symbol & Farbe", node_values: "Werte & Ring", soc: "Ladestand",
-    behaviour: "Verhalten", extra: "Zusatzinfo", actions: "Aktionen",
+    behaviour: "Verhalten", extra: "Zusatzinfo", actions: "Aktionen", second: "Zweiter Wechselrichter",
   },
   fields: {
     title: "Titel (optional)", title_color: "Titelfarbe", title_size: "Schriftgröße Titel",
@@ -1581,6 +1635,8 @@ const T_DE = {
     max_power: "Maximalleistung für den Ring", ring_source: "Ring zeigt",
     state_of_charge: "Ladestandssensor (%)", soc_display: "Anzeige des Ladestands", soc_color: "Farbe des Ladestands",
     charging_entity: "Sensor „lädt gerade“ (optional)", charging_state: "Zustände für „lädt“ (leer = automatisch)",
+    second_entity: "Zweiter Wechselrichter (Sensor)", second_display: "Anzeige Wechselrichter 2",
+    second_max_power: "Maximalleistung Wechselrichter 2", second_color: "Farbe Wechselrichter 2",
     subtract_from_home: "Vom Hausverbrauch abziehen", subtract_individual: "Verbraucher vom Hausverbrauch abziehen",
     secondary_entity: "Zusatzsensor (dritte Zeile)", secondary_unit: "Einheit Zusatzsensor", note: "Zusatztext (fest)",
     tap_action: "Aktion beim Antippen", hold_action: "Aktion beim Halten", double_tap_action: "Aktion beim Doppeltippen",
@@ -1608,6 +1664,8 @@ const T_DE = {
     subtract_from_home: "Verhindert, dass die Leistung doppelt im Haus mitgezählt wird.",
     subtract_individual: "Hauptschalter für alle Verbraucher.",
     note: "Erscheint als feste Zeile unter dem Wert.",
+    second_entity: "Wird zur PV-Leistung addiert. Der Summenwert steht im Knoten, darunter beide Werte in ihrer Farbe.",
+    second_max_power: "Leer = Maximalleistung der PV. Bestimmt, wie voll der innere Ring bei Wechselrichter 2 ist.",
   },
   node_helpers: {
     home: { entity: "Leer = Hausverbrauch wird als Bilanz aus PV, Netz und Speicher berechnet." },
@@ -1621,6 +1679,7 @@ const T_DE = {
     center_image_fit: { contain: "Mit Rand einpassen", cover: "Füllt den Kreis" },
     display_zero_mode: { show: "Unverändert", grey: "Ausgrauen", transparency: "Transparent", hide: "Ausblenden" },
     ring_source: { soc: "Ladestand", power: "Leistung" },
+    second_display: { ring: "Innerer Ring", none: "Nur Werte, kein Ring" },
     soc_display: { battery: "Batteriesymbol mit Prozent", ring: "Innerer Ring (voll = 100 %)", none: "Nicht anzeigen" },
     card_bg_mode: { theme: "Theme-Hintergrund", tinted: "Theme + Farbton", accent: "Volle Akzentfarbe", custom: "Eigene Farbe", none: "Transparent (kein Hintergrund)" },
     text_color_mode: { auto: "Automatisch (guter Kontrast)", theme: "Theme-Textfarbe", custom: "Eigene Farbe" },
@@ -1676,7 +1735,7 @@ const T_EN = {
     number: "Number format", zero: "Display at 0 W",
     card_bg: "Card – background & transparency", text: "Text", card_frame: "Card – border, shape & spacing",
     sensor: "Sensor", look: "Name, icon & color", node_values: "Values & ring", soc: "State of charge",
-    behaviour: "Behavior", extra: "Additional info", actions: "Actions",
+    behaviour: "Behavior", extra: "Additional info", actions: "Actions", second: "Second inverter",
   },
   fields: {
     title: "Title (optional)", title_color: "Title color", title_size: "Title font size",
@@ -1710,6 +1769,8 @@ const T_EN = {
     max_power: "Maximum power for the ring", ring_source: "Ring shows",
     state_of_charge: "State of charge sensor (%)", soc_display: "State of charge display", soc_color: "State of charge color",
     charging_entity: "“Charging” sensor (optional)", charging_state: "States meaning “charging” (empty = automatic)",
+    second_entity: "Second inverter (sensor)", second_display: "Display of inverter 2",
+    second_max_power: "Maximum power of inverter 2", second_color: "Color of inverter 2",
     subtract_from_home: "Subtract from home consumption", subtract_individual: "Subtract consumers from home consumption",
     secondary_entity: "Additional sensor (third line)", secondary_unit: "Additional sensor unit", note: "Additional text (fixed)",
     tap_action: "Tap action", hold_action: "Hold action", double_tap_action: "Double tap action",
@@ -1737,6 +1798,8 @@ const T_EN = {
     subtract_from_home: "Prevents the power from being counted twice in the home consumption.",
     subtract_individual: "Master switch for all consumers.",
     note: "Appears as a fixed line below the value.",
+    second_entity: "Is added to the PV power. The total is shown in the node, with both values below it in their colors.",
+    second_max_power: "Empty = maximum power of PV. Sets how full the inner ring for inverter 2 is.",
   },
   node_helpers: {
     home: { entity: "Empty = home consumption is calculated as the balance of solar, grid and battery." },
@@ -1750,6 +1813,7 @@ const T_EN = {
     center_image_fit: { contain: "Fit with margin", cover: "Fill the circle" },
     display_zero_mode: { show: "Unchanged", grey: "Grey out", transparency: "Transparent", hide: "Hide" },
     ring_source: { soc: "State of charge", power: "Power" },
+    second_display: { ring: "Inner ring", none: "Values only, no ring" },
     soc_display: { battery: "Battery icon with percentage", ring: "Inner ring (full = 100 %)", none: "Hidden" },
     card_bg_mode: { theme: "Theme background", tinted: "Theme + tint", accent: "Full accent color", custom: "Custom color", none: "Transparent (no background)" },
     text_color_mode: { auto: "Automatic (good contrast)", theme: "Theme text color", custom: "Custom color" },
@@ -2120,6 +2184,19 @@ class RadialFlowCardEditor extends HTMLElement {
       s.push(this._group("behaviour", "mdi:cog-outline", [{ name: "subtract_individual", selector: { boolean: {} } }]));
     }
 
+    if (type === "solar") {
+      s.push(this._group("second", "mdi:solar-panel", [
+        { name: "second_entity", selector: POWER_ENTITY },
+        ...(data.second_entity ? [
+          this._grid(
+            { name: "second_display", selector: this._opts("second_display", ["ring", "none"]) },
+            { name: "second_color", selector: { color_rgb: {} } },
+          ),
+          { name: "second_max_power", selector: this._num(0, 60000, 100, "W", "box") },
+        ] : []),
+      ]));
+    }
+
     s.push(this._group("extra", "mdi:information-outline", [
       { name: "secondary_entity", selector: { entity: {} } },
       ...(data.secondary_entity ? [{ name: "secondary_unit", selector: { text: {} } }] : []),
@@ -2168,13 +2245,14 @@ class RadialFlowCardEditor extends HTMLElement {
       data.entity_a = n.entity.consumption || n.entity.discharge || "";
       data.entity_b = n.entity.production || n.entity.charge || "";
     }
-    ["color", "soc_color"].forEach((k) => { if (data[k] !== undefined) data[k] = rgbOf(data[k]) || data[k]; });
+    ["color", "soc_color", "second_color"].forEach((k) => { if (data[k] !== undefined) data[k] = rgbOf(data[k]) || data[k]; });
     if (type === "individual") {
       if (data.soc_display === undefined) data.soc_display = "battery";
       data.subtract_from_home = n.subtract_from_home !== false;
     }
     if (type === "home") data.subtract_individual = n.subtract_individual !== false;
     if (type === "battery" && data.ring_source === undefined) data.ring_source = "soc";
+    if (type === "solar" && data.second_display === undefined) data.second_display = "ring";
     // Liste aus YAML im Textfeld als kommagetrennte Angabe zeigen
     if (Array.isArray(data.charging_state)) data.charging_state = data.charging_state.join(", ");
     return data;
@@ -2197,11 +2275,18 @@ class RadialFlowCardEditor extends HTMLElement {
     ["name", "icon", "unit", "note", "secondary_entity", "secondary_unit",
      "state_of_charge"].forEach((k) => put(k, data[k]));
     // Unveränderte Farben im ursprünglichen Format (z. B. Hex) belassen
-    ["color", "soc_color"].forEach((k) => {
+    ["color", "soc_color", "second_color"].forEach((k) => {
       if (Array.isArray(data[k]) && orig[k] !== undefined && sameRgb(orig[k], data[k])) data[k] = orig[k];
     });
     put("color", data.color);
     if (type === "battery" && data.ring_source === "power") out.ring_source = "power";
+    if (type === "solar" && data.second_entity) {
+      out.second_entity = data.second_entity;
+      // Standard ist der innere Ring; nur die Abweichung wird gespeichert
+      if (data.second_display === "none") out.second_display = "none";
+      put("second_color", data.second_color);
+      if (data.second_max_power) out.second_max_power = data.second_max_power;
+    }
     if (type === "individual") {
       // Anzeige nur speichern, wenn sie vom Standard (Batteriesymbol) abweicht
       if (data.soc_display && data.soc_display !== "battery") out.soc_display = data.soc_display;
@@ -2451,7 +2536,11 @@ class RadialFlowCardEditor extends HTMLElement {
     let unitTxt = "";
     let pct = 1;
     if (n.entity) {
-      const w = Math.abs(readEntity(this._hass, n.entity, !!n.invert));
+      // PV mit zweitem Wechselrichter: Vorschau zeigt die Summe, der Ring nur Wechselrichter 1
+      const w1 = Math.abs(readEntity(this._hass, n.entity, !!n.invert));
+      const w = type === "solar" && n.second_entity
+        ? w1 + Math.abs(readEntity(this._hass, n.second_entity, false))
+        : w1;
       const u = n.unit;
       const dec = n.decimals;
       if (u === "W") [valTxt, unitTxt] = [w.toFixed(dec ?? c.base_decimals), "W"];
@@ -2461,7 +2550,7 @@ class RadialFlowCardEditor extends HTMLElement {
       else [valTxt, unitTxt] = [w.toFixed(dec ?? c.base_decimals), "W"];
       if (type === "battery" && n.ring_source !== "power" && n.state_of_charge && this._hass.states[n.state_of_charge]) {
         pct = clamp(num(this._hass.states[n.state_of_charge].state) / 100, 0, 1);
-      } else if (n.max_power > 0) pct = clamp(w / n.max_power, 0, 1);
+      } else if (n.max_power > 0) pct = clamp(w1 / n.max_power, 0, 1);
     }
 
     const r = 44;
