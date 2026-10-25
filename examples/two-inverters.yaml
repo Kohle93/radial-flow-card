@@ -1,0 +1,20 @@
+# Two PV inverters in one PV node.
+# The node shows the total; below it both values in their own colors.
+# Wechselrichter 1 = outer ring (node color), Wechselrichter 2 = inner ring.
+# second_display: none   -> only the values, no inner ring
+type: custom:radial-flow-card
+title: Solar
+speed: 1
+
+solar:
+  entity: sensor.inverter_1_power
+  max_power: 6000
+  second_entity: sensor.inverter_2_power
+  second_max_power: 3000        # optional, default = max_power
+  second_color: "#e8833a"
+  second_display: ring
+grid:
+  entity: sensor.grid_power
+battery:
+  entity: sensor.battery_power
+  state_of_charge: sensor.battery_soc

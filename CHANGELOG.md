@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.5.0
+- New: a second PV inverter can be combined into the PV node
+  (`solar.second_entity`). The node shows the total, which drives the flow and
+  the home balance, and below it both values in their own colors. Inverter 1 is the
+  outer ring, inverter 2 an inner ring like the wallbox state of charge
+  (`second_display: ring | none`, `second_color`, `second_max_power`).
+  Configurable in the editor under Nodes → PV → "Zweiter Wechselrichter"
+
 ## 5.4.0
 - Editor and card texts are now bilingual: German when Home Assistant runs in
   German, English otherwise (weather conditions, default node names, all

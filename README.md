@@ -149,6 +149,26 @@ a charging power sensor work right away. With `charging_state` only the states
 listed there count (comma-separated or as a list, case-insensitive).
 Without `charging_entity` the state of charge is always visible.
 
+### Two inverters
+
+A second PV inverter can be combined into the PV node. The node shows the total
+of both, and below it both values appear in their own colors. Inverter 1 is the
+outer ring (node color), inverter 2 is an inner ring in its own color, just like the
+state of charge of a wallbox. `second_display: none` keeps the values and drops the
+inner ring. [`examples/two-inverters.yaml`](https://github.com/Kohle93/radial-flow-card/blob/main/examples/two-inverters.yaml)
+
+```yaml
+solar:
+  entity: sensor.inverter_1_power
+  max_power: 6000
+  second_entity: sensor.inverter_2_power
+  second_max_power: 3000     # optional, default = max_power
+  second_color: "#e8833a"
+  second_display: ring       # or none
+```
+
+The total feeds the flow and the home balance, so nothing is counted twice.
+
 ### Light theme
 
 The card uses the colors of the active theme. With light themes, stronger
@@ -318,6 +338,10 @@ Applies to `solar`, `grid`, `battery`, `home` and every entry under `individual`
 | `charging_state` | string \| list | `individual` only: states that count as "charging"; empty = automatic |
 | `subtract_from_home` | bool | `individual` only: subtract from the home consumption, on by default |
 | `subtract_individual` | bool | `home` only: master switch for all consumers |
+| `second_entity` | string | `solar` only: power sensor of a second inverter, added to the PV power |
+| `second_display` | string | `solar` only: `ring` (default, inner ring for inverter 2) or `none` (values only) |
+| `second_color` | string \| [r,g,b] | `solar` only: color of inverter 2, default `#e8833a` |
+| `second_max_power` | number | `solar` only: maximum power of inverter 2 for its inner ring; empty = `max_power` |
 | `secondary_entity` | string | Additional sensor in the third line |
 | `secondary_unit` | string | Unit for it |
 | `note` | string | Fixed additional text |
